@@ -27,7 +27,7 @@ public class keyGenerator {
 			e.printStackTrace();
 		}
 		kg.initialize(1024);
-		System.out.println(args[0]);
+	//	System.out.println(args[0]);
 		if(args.length>0) {
 			for(int i=0;i<Integer.parseInt(args[0]);i++) {
 				KeyPair kp=kg.genKeyPair();
