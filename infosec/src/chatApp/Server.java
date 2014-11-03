@@ -4,10 +4,29 @@ package chatApp;
 /*
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
-import java.io.*;
-import java.net.*;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.math.BigInteger;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPrivateKeySpec;
+import java.security.spec.RSAPublicKeySpec;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
 
 /*
  * The server that can be run both as a console application or a GUI
@@ -25,8 +44,10 @@ public class Server {
 	private int port;
 	// the boolean that will be turned of to stop the server
 	private boolean keepGoing;
-	
-
+	//server public Key
+	RSAPublicKey ServerPublicKey;
+	RSAPrivateKey ServerPrivateKey;
+	static X509Certificate ServerCertificate;
 	/*
 	 *  server constructor that receive the port to listen to for connection as parameter
 	 *  in console
@@ -44,8 +65,106 @@ public class Server {
 		sdf = new SimpleDateFormat("HH:mm:ss");
 		// ArrayList for the Client list
 		al = new ArrayList<ClientThread>();
+		try {
+			//ServerPublicKey= readPublicKey("public0.key");
+			ServerCertificate=readCert("Server.cer");
+			ServerPrivateKey=readPrivateKey("private0.key");
+		} catch (NoSuchAlgorithmException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		//System.out.println(ServerPublicKey.toString());
+		
 	}
 	
+	private X509Certificate readCert(String filename) {
+		// TODO Auto-generated method stub
+		FileInputStream fis;
+		BufferedInputStream bis=null;
+		try {
+			fis = new FileInputStream(filename);
+			 bis= new BufferedInputStream(fis);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		 
+
+		 CertificateFactory cf;
+		try {
+			cf = CertificateFactory.getInstance("X.509");			
+			    Certificate cert = cf.generateCertificate(bis);
+//			    System.out.println("2");
+//			    System.out.println(cert.toString());
+		
+		}catch (CertificateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+			
+		
+		return null;
+	}
+
+	private RSAPrivateKey readPrivateKey(String fileName) throws FileNotFoundException,
+			IOException,
+			NoSuchAlgorithmException {
+		// TODO Auto-generated method stub
+		 ObjectInputStream oin = new ObjectInputStream(
+				    new BufferedInputStream(new FileInputStream(fileName)));
+		 BigInteger mod;
+		 BigInteger exp;
+		 try {
+			 mod=(BigInteger) oin.readObject();
+			 exp=(BigInteger) oin.readObject();
+		 }catch (Exception e) {
+			    throw new IOException("Unexpected error", e);
+		 } finally {
+		    oin.close();
+		 }
+		 KeyFactory r=KeyFactory.getInstance("RSA");
+		 RSAPrivateKeySpec spec=new RSAPrivateKeySpec(mod, exp);
+		 RSAPrivateKey pk=null;
+		try {
+			pk = (RSAPrivateKey) r.generatePrivate(spec);
+		//	System.out.println(pk.toString());
+		} catch (InvalidKeySpecException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}		
+			return pk;
+			 
+		
+	}
+
+	private RSAPublicKey readPublicKey(String fileName) throws FileNotFoundException, IOException, NoSuchAlgorithmException {
+		// TODO Auto-generated method stub
+		 ObjectInputStream oin = new ObjectInputStream(
+				    new BufferedInputStream(new FileInputStream(fileName)));
+		 BigInteger mod;
+		 BigInteger exp;
+		 try {
+			 mod=(BigInteger) oin.readObject();
+			 exp=(BigInteger) oin.readObject();
+		 }catch (Exception e) {
+			    throw new IOException("Unexpected error", e);
+		 } finally {
+		    oin.close();
+		 }
+		 KeyFactory r=KeyFactory.getInstance("RSA");
+		 RSAPublicKeySpec spec=new RSAPublicKeySpec(mod, exp);
+		 RSAPublicKey pk=null;
+		try {
+			pk = (RSAPublicKey) r.generatePublic(spec);
+		//	System.out.println(pk.toString());
+		} catch (InvalidKeySpecException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}		
+			return pk;
+	}
+
 	public void start() {
 		keepGoing = true;
 		/* create socket server and wait for connection requests */
@@ -203,6 +322,7 @@ public class Server {
 
 		// Constructore
 		ClientThread(Socket socket) {
+			
 			// a unique id
 			id = ++uniqueId;
 			this.socket = socket;
@@ -213,6 +333,8 @@ public class Server {
 				// create output first
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
+				
+				sOutput.writeObject(Server.ServerCertificate.toString());
 				// read the username
 				username = (String) sInput.readObject();
 				display(username + " just connected.");
