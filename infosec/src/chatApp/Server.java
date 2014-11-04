@@ -67,8 +67,11 @@ public class Server {
 		al = new ArrayList<ClientThread>();
 		try {
 			//ServerPublicKey= readPublicKey("public0.key");
-			ServerCertificate=readCert("Server.cer");
 			ServerPrivateKey=readPrivateKey("private0.key");
+			//System.out.println(ServerPrivateKey);
+			ServerCertificate=readCert("Server.cer");
+			//System.out.println(ServerCertificate.toString());
+			
 		} catch (NoSuchAlgorithmException | IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -92,11 +95,12 @@ public class Server {
 		 
 
 		 CertificateFactory cf;
+		  Certificate cert=null;
 		try {
 			cf = CertificateFactory.getInstance("X.509");			
-			    Certificate cert = cf.generateCertificate(bis);
+			    cert = cf.generateCertificate(bis);
 //			    System.out.println("2");
-//			    System.out.println(cert.toString());
+			    //System.out.println(cert.toString());
 		
 		}catch (CertificateException e) {
 			// TODO Auto-generated catch block
@@ -104,7 +108,7 @@ public class Server {
 		}
 			
 		
-		return null;
+		return (X509Certificate) cert;
 	}
 
 	private RSAPrivateKey readPrivateKey(String fileName) throws FileNotFoundException,
@@ -334,7 +338,7 @@ public class Server {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				
-				sOutput.writeObject(Server.ServerCertificate.toString());
+				sOutput.writeObject(ServerCertificate);
 				// read the username
 				username = (String) sInput.readObject();
 				display(username + " just connected.");
@@ -354,6 +358,14 @@ public class Server {
 		public void run() {
 			// to loop until LOGOUT
 			boolean keepGoing = true;
+			X509Certificate ClientCert=null;
+			try {
+				ClientCert=(X509Certificate) sInput.readObject();
+			} catch (ClassNotFoundException | IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			System.out.println(ClientCert.toString());
 			while(keepGoing) {
 				// read a String (which is an object)
 				try {

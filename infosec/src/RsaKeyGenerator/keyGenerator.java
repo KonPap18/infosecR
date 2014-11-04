@@ -135,6 +135,7 @@ public class keyGenerator {
    certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
    certGen.setNotBefore(new Date(System.currentTimeMillis() - 10000));
    certGen.setNotAfter(new Date(System.currentTimeMillis() + 10000));
+   
    certGen.setPublicKey(pair.getPublic());   
    certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
    certGen.setIssuerDN(new X500Principal("CN=MyCA"));

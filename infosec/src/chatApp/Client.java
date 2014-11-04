@@ -15,12 +15,18 @@ import java.math.BigInteger;
 import java.net.Socket;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPrivateKeySpec;
+import java.util.Date;
 import java.util.Scanner;
+import java.security.cert.CertificateNotYetValidException;
 
 /*
  * The Client that can be run both as a console or a GUI
@@ -40,6 +46,8 @@ public class Client {
 	private int port;
 	private RSAPrivateKey ClientPrivateKey;
 	private RSAPublicKey ServerPublicKey;
+	private boolean trusted;
+	private X509Certificate ClientCertificate;
 
 	/*
 	 * Constructor called by console mode server: the server address port: the
@@ -55,6 +63,7 @@ public class Client {
 	 * parameter is null
 	 */
 	Client(String server, int port, String username, ClientGUI cg) {
+		boolean trusted;
 		NUMBER_OF_CLIENTS++;
 		this.server = server;
 		this.port = port;
@@ -67,9 +76,41 @@ public class Client {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+			ClientCertificate=readCert("Client1.cer");
+		
 		//System.out.println(ClientPrivateKey.toString());
 	}
 
+	private X509Certificate readCert(String filename) {
+		// TODO Auto-generated method stub
+		FileInputStream fis;
+		BufferedInputStream bis=null;
+		try {
+			fis = new FileInputStream(filename);
+			 bis= new BufferedInputStream(fis);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		 
+
+		 CertificateFactory cf;
+		  Certificate cert=null;
+		try {
+			cf = CertificateFactory.getInstance("X.509");			
+			   cert= cf.generateCertificate(bis);
+//			    System.out.println("2");
+//			    System.out.println(cert.toString());
+		
+		}catch (CertificateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+			
+		
+		return (X509Certificate) cert;
+	}
 	/*
 	 * To start the dialog
 	 */
@@ -101,8 +142,12 @@ public class Client {
 		new ListenFromServer().start();
 		// Send our username to the server this is the only message that we
 		// will send as a String. All other messages will be ChatMessage objects
-		try {
-			sOutput.writeObject(username);
+		
+		try {		
+
+		sOutput.writeObject(username);	
+	
+			
 		} catch (IOException eIO) {
 			display("Exception doing login : " + eIO);
 			disconnect();
@@ -275,7 +320,32 @@ public class Client {
 	class ListenFromServer extends Thread {
 
 		public void run() {
-			while (true) {
+			X509Certificate ServerCert=null;
+			boolean certok=false;
+			//	sOutput.writeObject(this.);			
+					 try {
+						ServerCert = ( X509Certificate)sInput.readObject();// diavazoume to pistopoiitiko tou server
+					} catch (IOException | ClassNotFoundException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}				
+			//	System.out.println(ServerCert.toString());
+				try{
+					ServerCert.checkValidity(new Date());//tsekaroume oti einai se isxu
+				}catch(CertificateExpiredException | CertificateNotYetValidException r){
+					System.out.println("Invalid Certificate");
+					
+				}
+				certok=true;//an ftasei mexri edw kai einai se isxu mporoume na arxisoume tin epikonwnia
+				try {
+					sOutput.writeObject(ClientCertificate);
+					
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			
+			while (certok) {
 				//X509Certificate cer=null;
 				 //msg =" ";
 				try {
