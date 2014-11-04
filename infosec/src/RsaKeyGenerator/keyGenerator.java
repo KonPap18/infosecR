@@ -134,7 +134,7 @@ public class keyGenerator {
    X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
    certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
    certGen.setNotBefore(new Date(System.currentTimeMillis() - 10000));
-   certGen.setNotAfter(new Date(System.currentTimeMillis() + 10000));
+   certGen.setNotAfter(new Date(2015, 11, 30));
    
    certGen.setPublicKey(pair.getPublic());   
    certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
