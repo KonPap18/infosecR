@@ -128,7 +128,7 @@ public class Client {
 		String msg = "Connection accepted " + socket.getInetAddress() + ":"
 				+ socket.getPort();
 		display(msg);
-
+		
 		/* Creating both Data Stream */
 		try {
 			sInput = new ObjectInputStream(socket.getInputStream());
