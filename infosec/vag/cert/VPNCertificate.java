@@ -301,4 +301,3 @@ public class VPNCertificate {
         return "VPNCertificate\nIssuer:" + this.issuer + "\nSubject:" + this.subject + "\nSerial Number:" + this.serial + "\nStarting: " + this.startDate + "\nExpiring: " + this.endDate;
     }
 }
-
