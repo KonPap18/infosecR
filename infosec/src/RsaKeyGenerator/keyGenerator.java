@@ -76,6 +76,7 @@ public class keyGenerator {
 				}
 				try {
 					 cert = generateV1Certificate(kp, name);
+					 System.out.println(cert.toString());
 				} catch (InvalidKeyException | NoSuchProviderException
 						| SignatureException e1) {
 					// TODO Auto-generated catch block
@@ -93,8 +94,8 @@ public class keyGenerator {
 			}
 		}else {
 			KeyPair kp=kg.genKeyPair();
-			System.out.println(kp.getPublic().toString()+"\n");
-			System.out.println(kp.getPrivate().toString());
+			//System.out.println(kp.getPublic().toString()+"\n");
+			//System.out.println(kp.getPrivate().toString());
 		}
 
 	}
@@ -134,7 +135,11 @@ public class keyGenerator {
    X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
    certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
    certGen.setNotBefore(new Date(System.currentTimeMillis() - 10000));
-   certGen.setNotAfter(new Date(2015, 11, 30));
+   Date d=new Date();
+   d.setYear(2015);
+  // certGen.setNotAfter(new Date(System.currentTimeMillis() + 999999999999999999L));
+   certGen.setNotAfter(d);
+   System.out.println(d.toString());
    
    certGen.setPublicKey(pair.getPublic());   
    certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
