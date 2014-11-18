@@ -14,7 +14,10 @@ import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyFactory;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.KeyStore.TrustedCertificateEntry;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -47,6 +50,9 @@ public class Server {
 	//server public Key
 	RSAPublicKey ServerPublicKey;
 	RSAPrivateKey ServerPrivateKey;
+	private X509Certificate ClientCertificate1;
+	private X509Certificate ClientCertificate2;
+	private KeyStore serverKeystore;
 	static X509Certificate ServerCertificate;
 	/*
 	 *  server constructor that receive the port to listen to for connection as parameter
@@ -65,6 +71,7 @@ public class Server {
 		sdf = new SimpleDateFormat("HH:mm:ss");
 		// ArrayList for the Client list
 		al = new ArrayList<ClientThread>();
+		loadKeystore();
 		try {
 			//ServerPublicKey= readPublicKey("public0.key");
 			ServerPrivateKey=readPrivateKey("private0.key");
@@ -81,6 +88,49 @@ public class Server {
 		
 	}
 	
+	private void loadKeystore() {
+		// TODO Auto-generated method stub
+		// TODO Auto-generated method stub
+				ServerCertificate = readCert("Server.cer");
+				try {
+					ServerPrivateKey = readPrivateKey("private0.key");
+				} catch (NoSuchAlgorithmException | IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				ClientCertificate1 = readCert("Client1.cer");
+				ClientCertificate2=readCert("Client2.cer");
+				Certificate[] certificatechain = new Certificate[1];
+				try {
+					serverKeystore = KeyStore.getInstance(KeyStore.getDefaultType());
+					serverKeystore.load(null);
+				} catch (KeyStoreException | NoSuchAlgorithmException
+						| CertificateException | IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				try {
+					TrustedCertificateEntry cl1 = new TrustedCertificateEntry(
+							ClientCertificate1);
+					TrustedCertificateEntry cl2 = new TrustedCertificateEntry(
+							ClientCertificate2);
+
+					serverKeystore.setKeyEntry(
+							"Serverkey", ServerPrivateKey, "123456".toCharArray(), certificatechain);
+					serverKeystore.setCertificateEntry(
+							"Server", ServerCertificate);
+					
+					serverKeystore.setEntry("Client1", cl1, null);
+					serverKeystore.setEntry("Client2", cl2, null);
+				} catch (KeyStoreException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}		
+				
+				
+		
+	}
+
 	private X509Certificate readCert(String filename) {
 		// TODO Auto-generated method stub
 		FileInputStream fis;
@@ -339,17 +389,14 @@ public class Server {
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				
 				sOutput.writeObject(ServerCertificate);
+				
 				// read the username
-				username = (String) sInput.readObject();
-				display(username + " just connected.");
+				//username = (String) sInput.readObject();
+				//display(username + " just connected.");
 			}
 			catch (IOException e) {
 				display("Exception creating new Input/output Streams: " + e);
 				return;
-			}
-			// have to catch ClassNotFoundException
-			// but I read a String, I am sure it will work
-			catch (ClassNotFoundException e) {
 			}
             date = new Date().toString() + "\n";
 		}

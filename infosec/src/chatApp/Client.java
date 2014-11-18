@@ -14,25 +14,29 @@ import java.io.ObjectOutputStream;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.security.KeyFactory;
+import java.security.KeyStore;
+import java.security.KeyStore.TrustedCertificateEntry;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableEntryException;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPrivateKeySpec;
 import java.util.Date;
 import java.util.Scanner;
-import java.security.cert.CertificateNotYetValidException;
 
 /*
  * The Client that can be run both as a console or a GUI
  */
 public class Client {
-	private static int NUMBER_OF_CLIENTS=0;
+
 	// for I/O
 	private ObjectInputStream sInput; // to read from the socket
 	private ObjectOutputStream sOutput; // to write on the socket
@@ -45,9 +49,11 @@ public class Client {
 	private String server, username;
 	private int port;
 	private RSAPrivateKey ClientPrivateKey;
-	private RSAPublicKey ServerPublicKey;
+	// private RSAPublicKey ServerPublicKey;
 	private boolean trusted;
 	private X509Certificate ClientCertificate;
+	private X509Certificate ServerCertificate;
+	private KeyStore clientKeystore;
 
 	/*
 	 * Constructor called by console mode server: the server address port: the
@@ -62,55 +68,90 @@ public class Client {
 	 * Constructor call when used from a GUI in console mode the ClienGUI
 	 * parameter is null
 	 */
+	/**
+	 * @param server
+	 * @param port
+	 * @param username
+	 * @param cg
+	 */
 	Client(String server, int port, String username, ClientGUI cg) {
 		boolean trusted;
-		NUMBER_OF_CLIENTS++;
 		this.server = server;
 		this.port = port;
 		this.username = username;
 		// save if we are in GUI mode or not
 		this.cg = cg;
+		loadKeystore();
+
+	}
+
+	private void loadKeystore() {
+		// TODO Auto-generated method stub
+		ServerCertificate = readCert("Server.cer");
 		try {
-			ClientPrivateKey=readPrivateKey("private"+NUMBER_OF_CLIENTS+".key");
-		} catch (NoSuchAlgorithmException | IOException e) {
+			ClientPrivateKey = readPrivateKey("private"
+					+ username.substring(username.length() - 1,
+							username.length()) + ".key");
+		} catch (NoSuchAlgorithmException | IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		ClientCertificate = readCert("Client"
+				+ username.substring(username.length() - 1, username.length())
+				+ ".cer");
+		Certificate[] certificatechain = new Certificate[1];
+		try {
+			clientKeystore = KeyStore.getInstance(KeyStore.getDefaultType());
+			clientKeystore.load(null);
+		} catch (KeyStoreException | NoSuchAlgorithmException
+				| CertificateException | IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-			ClientCertificate=readCert("Client1.cer");
-		
-		//System.out.println(ClientPrivateKey.toString());
+		try {
+			TrustedCertificateEntry serveren = new TrustedCertificateEntry(
+					ServerCertificate);
+
+			clientKeystore.setKeyEntry(
+					"Client"
+							+ username.substring(username.length() - 1,
+									username.length()) + "key",
+					ClientPrivateKey, "123456".toCharArray(), certificatechain);
+			clientKeystore.setCertificateEntry(
+					"Client"
+							+ username.substring(username.length() - 1,
+									username.length()), ClientCertificate);
+			clientKeystore.setEntry("Server", serveren, null);
+		} catch (KeyStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 
 	private X509Certificate readCert(String filename) {
 		// TODO Auto-generated method stub
 		FileInputStream fis;
-		BufferedInputStream bis=null;
+		BufferedInputStream bis = null;
 		try {
 			fis = new FileInputStream(filename);
-			 bis= new BufferedInputStream(fis);
+			bis = new BufferedInputStream(fis);
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		 
-
-		 CertificateFactory cf;
-		  Certificate cert=null;
+		CertificateFactory cf;
+		Certificate cert = null;
 		try {
-			cf = CertificateFactory.getInstance("X.509");			
-			   cert= cf.generateCertificate(bis);
-//			    System.out.println("2");
-//			    System.out.println(cert.toString());
-		
-		}catch (CertificateException e) {
+			cf = CertificateFactory.getInstance("X.509");
+			cert = cf.generateCertificate(bis);
+		} catch (CertificateException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-			
-		
 		return (X509Certificate) cert;
 	}
+
 	/*
 	 * To start the dialog
 	 */
@@ -128,7 +169,7 @@ public class Client {
 		String msg = "Connection accepted " + socket.getInetAddress() + ":"
 				+ socket.getPort();
 		display(msg);
-		
+
 		/* Creating both Data Stream */
 		try {
 			sInput = new ObjectInputStream(socket.getInputStream());
@@ -142,12 +183,11 @@ public class Client {
 		new ListenFromServer().start();
 		// Send our username to the server this is the only message that we
 		// will send as a String. All other messages will be ChatMessage objects
-		
-		try {		
 
-		sOutput.writeObject(username);	
-	
-			
+		try {
+
+			sOutput.writeObject(username);
+
 		} catch (IOException eIO) {
 			display("Exception doing login : " + eIO);
 			disconnect();
@@ -256,6 +296,7 @@ public class Client {
 
 		// depending of the number of arguments provided we fall through
 		switch (args.length) {
+
 		// > javac Client username portNumber serverAddr
 		case 3:
 			serverAddress = args[2];
@@ -320,37 +361,44 @@ public class Client {
 	class ListenFromServer extends Thread {
 
 		public void run() {
-			X509Certificate ServerCert=null;
-			boolean certok=false;
-			//	sOutput.writeObject(this.);			
-					 try {
-						ServerCert = ( X509Certificate)sInput.readObject();// diavazoume to pistopoiitiko tou server
-					} catch (IOException | ClassNotFoundException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}				
-			//	System.out.println(ServerCert.toString());
-				try{
-					ServerCert.checkValidity(new Date());//tsekaroume oti einai se isxu
-				}catch(CertificateExpiredException | CertificateNotYetValidException r){
-					System.out.println("Invalid Certificate");
-					
-				}
-				certok=true;//an ftasei mexri edw kai einai se isxu mporoume na arxisoume tin epikonwnia
-				try {
-					sOutput.writeObject(ClientCertificate);
-					
-				} catch (IOException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-			
+			X509Certificate ServerCert = null;
+			boolean certok = false;
+			// sOutput.writeObject(this.);
+			try {
+				ServerCert = (X509Certificate) sInput.readObject();// diavazoume
+				System.out.println(ServerCert.toString());													// to
+																	// pistopoiitiko
+																	// tou
+																	// server
+			} catch (IOException | ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			// System.out.println(ServerCert.toString());
+			try {
+				ServerCert.checkValidity(new Date());// tsekaroume oti einai se
+														// isxu
+			} catch (CertificateExpiredException
+					| CertificateNotYetValidException r) {
+				System.out.println("Invalid Certificate");
+
+			}
+			certok = true;// an ftasei mexri edw kai einai se isxu mporoume na
+							// arxisoume tin epikonwnia
+			try {
+				sOutput.writeObject(ClientCertificate);
+
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+
 			while (certok) {
-				//X509Certificate cer=null;
-				 //msg =" ";
+				// X509Certificate cer=null;
+				// msg =" ";
 				try {
 					String msg = (String) sInput.readObject();
-					
+
 					// if console mode print the message and add back the prompt
 					if (cg == null) {
 						System.out.println(msg);
