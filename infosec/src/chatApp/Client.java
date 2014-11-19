@@ -18,8 +18,6 @@ import java.security.KeyStore;
 import java.security.KeyStore.TrustedCertificateEntry;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableEntryException;
-import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
@@ -32,6 +30,8 @@ import java.security.spec.RSAPrivateKeySpec;
 import java.util.Date;
 import java.util.Scanner;
 
+import javax.swing.JOptionPane;
+
 /*
  * The Client that can be run both as a console or a GUI
  */
@@ -41,6 +41,7 @@ public class Client {
 	private ObjectInputStream sInput; // to read from the socket
 	private ObjectOutputStream sOutput; // to write on the socket
 	private Socket socket;
+	//private Socket byteBinded;
 
 	// if I use a GUI or not
 	private ClientGUI cg;
@@ -54,6 +55,9 @@ public class Client {
 	private X509Certificate ClientCertificate;
 	private X509Certificate ServerCertificate;
 	private KeyStore clientKeystore;
+	private boolean trustedconnection;
+	public Object infoMessage;
+	public String titleBar;
 
 	/*
 	 * Constructor called by console mode server: the server address port: the
@@ -82,6 +86,7 @@ public class Client {
 		// save if we are in GUI mode or not
 		this.cg = cg;
 		loadKeystore();
+		trustedconnection=false;
 
 	}
 
@@ -183,7 +188,8 @@ public class Client {
 		new ListenFromServer().start();
 		// Send our username to the server this is the only message that we
 		// will send as a String. All other messages will be ChatMessage objects
-
+		
+		if(trustedconnection){
 		try {
 
 			sOutput.writeObject(username);
@@ -192,6 +198,7 @@ public class Client {
 			display("Exception doing login : " + eIO);
 			disconnect();
 			return false;
+		}
 		}
 		// success we inform the caller that it worked
 		return true;
@@ -366,7 +373,7 @@ public class Client {
 			// sOutput.writeObject(this.);
 			try {
 				ServerCert = (X509Certificate) sInput.readObject();// diavazoume
-				System.out.println(ServerCert.toString());													// to
+				System.out.println("CLIENT SIDE, WRITING SERVER'S CERTIFICATE \n "+ServerCert.toString());													// to
 																	// pistopoiitiko
 																	// tou
 																	// server
@@ -383,17 +390,38 @@ public class Client {
 				System.out.println("Invalid Certificate");
 
 			}
-			certok = true;// an ftasei mexri edw kai einai se isxu mporoume na
-							// arxisoume tin epikonwnia
+			certok = true;// an ftasei mexri edw kai einai se isxu tou server mporoume na
+			if(certok){				// arxisoume tin epikonwnia kai na steiloume to diko mas
+				try {
+					sOutput.writeObject(ClientCertificate);
+	
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}else{
+				//display("Server says:Not trusted connection");
+				 JOptionPane.showMessageDialog(null, "Server not trusted", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
+			
+					
+					System.exit(0);
+			}
 			try {
-				sOutput.writeObject(ClientCertificate);
-
+				trustedconnection=sInput.readBoolean();
 			} catch (IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
+				
 			}
-
-			while (certok) {
+			if(!trustedconnection){
+				//display("Server says:Not trusted connection");
+				 JOptionPane.showMessageDialog(null, "Server says:Not trusted connection", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
+			
+					
+					System.exit(0);
+			
+			}
+			while (trustedconnection) {
 				// X509Certificate cer=null;
 				// msg =" ";
 				try {

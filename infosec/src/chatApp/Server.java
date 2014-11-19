@@ -363,6 +363,7 @@ public class Server {
 	class ClientThread extends Thread {
 		// the socket where to listen/talk
 		Socket socket;
+	//	Socket byteBinded;
 		ObjectInputStream sInput;
 		ObjectOutputStream sOutput;
 		// my unique id (easier for deconnection)
@@ -388,7 +389,8 @@ public class Server {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				
-				sOutput.writeObject(ServerCertificate);
+				//sOutput.writeObject(ServerCertificate.getEncoded());
+				
 				
 				// read the username
 				//username = (String) sInput.readObject();
@@ -404,15 +406,35 @@ public class Server {
 		// what will run forever
 		public void run() {
 			// to loop until LOGOUT
-			boolean keepGoing = true;
+			boolean keepGoing = false;
 			X509Certificate ClientCert=null;
+			
 			try {
 				ClientCert=(X509Certificate) sInput.readObject();
 			} catch (ClassNotFoundException | IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
-			System.out.println(ClientCert.toString());
+			System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.toString());
+			if(CertifiacteValid(ClientCert)){
+				keepGoing=true;
+				try {
+					sOutput.writeBoolean(true);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+			}else{
+				display("Not trusted connection");
+				try {
+					sOutput.writeBoolean(false);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+			}
 			while(keepGoing) {
 				// read a String (which is an object)
 				try {
@@ -454,6 +476,13 @@ public class Server {
 			close();
 		}
 		
+		
+
+		private boolean CertifiacteValid(X509Certificate clientCert) {
+			// TODO Auto-generated method stub
+			return false;
+		}
+
 		// try to close everything
 		private void close() {
 			// try to close the connection
