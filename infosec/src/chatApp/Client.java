@@ -36,7 +36,9 @@ import javax.swing.JOptionPane;
  * The Client that can be run both as a console or a GUI
  */
 public class Client {
-
+	private static final char[] keystorePass1={'c','l','i','e','n','t','1','p','a','s','s'};
+	private static final char[] keystorePass2={'c','l','i','e','n','t','2','p','a','s','s'};
+	private boolean isClient1;
 	// for I/O
 	private ObjectInputStream sInput; // to read from the socket
 	private ObjectOutputStream sOutput; // to write on the socket
@@ -92,11 +94,64 @@ public class Client {
 
 	private void loadKeystore() {
 		// TODO Auto-generated method stub
-		ServerCertificate = readCert("Server.cer");
+		FileInputStream f;
+		if(username.substring(username.length() - 1,
+				username.length()).equals("1")){
+			isClient1=true;
+			try {
+			 f= new FileInputStream("client1keystore");
+				KeyStore ks = KeyStore.getInstance("JKS");
+				ks.load(f, keystorePass2);
+				f.close();
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (KeyStoreException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (CertificateException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		}else{
+			isClient1=false;
+			try {
+				f = new FileInputStream("client2keystore");
+				KeyStore ks = KeyStore.getInstance("JKS");
+				ks.load(f, keystorePass2);
+				f.close();
+			} catch (FileNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (KeyStoreException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (CertificateException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		
+		/*ServerCertificate = readCert("Server.cer");
 		try {
 			ClientPrivateKey = readPrivateKey("private"
 					+ username.substring(username.length() - 1,
 							username.length()) + ".key");
+			System.out.println(ClientPrivateKey.toString());
 		} catch (NoSuchAlgorithmException | IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
@@ -130,7 +185,7 @@ public class Client {
 		} catch (KeyStoreException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		}*/
 
 	}
 

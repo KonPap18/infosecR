@@ -47,6 +47,7 @@ public class keyGenerator {
 		java.security.cert.X509Certificate cert=null;
 		if(args.length>0) {
 			for(int i=0;i<Integer.parseInt(args[0]);i++) {
+				
 				KeyPair kp=kg.genKeyPair();				
 				RSAPublicKeySpec pub;
 				
