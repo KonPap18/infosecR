@@ -18,10 +18,14 @@ import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.KeyStore.TrustedCertificateEntry;
+import java.security.NoSuchProviderException;
+import java.security.Principal;
+import java.security.SignatureException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -43,7 +47,7 @@ import crypto.AES;
  * The server that can be run both as a console application or a GUI
  */
 public class Server {
-	private static final char[] keystorePass = "Serverpass".toCharArray();
+	private static final char[] keystorePass = {'s','e','r','v','e','r','p','a','s','s'};;
 	// a unique ID for each connection
 	private static int uniqueId;
 	// an ArrayList to keep the list of the Client
@@ -93,8 +97,8 @@ public class Server {
 			
 				try {
 				 f= new FileInputStream("Serverkeystore");
-					KeyStore ks = KeyStore.getInstance("JKS");
-					ks.load(f, keystorePass);
+					serverKeystore = KeyStore.getInstance("JKS");
+					serverKeystore.load(f, keystorePass);
 					f.close();
 				} catch (FileNotFoundException e) {
 					// TODO Auto-generated catch block
@@ -313,7 +317,7 @@ public class Server {
 		else
 			sg.appendEvent(time + "\n");
 	}
-	/*
+		/*
 	 *  to broadcast a message to all Clients
 	 */
 	private synchronized void broadcast(String message) {
@@ -416,7 +420,12 @@ public class Server {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				
-				//sOutput.writeObject(ServerCertificate.getEncoded());
+				try {
+					sOutput.writeObject(serverKeystore.getCertificate("server"));
+				} catch (KeyStoreException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
 				
 				// read the username
@@ -436,13 +445,15 @@ public class Server {
 			boolean keepGoing = false;
 			X509Certificate ClientCert=null;
 			
+			
+			
 			try {
 				ClientCert=(X509Certificate) sInput.readObject();
 			} catch (ClassNotFoundException | IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
-			System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.toString());
+			System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.getSubjectDN().getName());
 			if(CertifiacteValidAndVerified(ClientCert)){
 				keepGoing=true;
 				try {
@@ -463,6 +474,13 @@ public class Server {
 				}
 				
 			}
+			try {
+				username = (String) sInput.readObject();
+			} catch (ClassNotFoundException | IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			display(username + " just connected.");
 			while(keepGoing) {
 				// read a String (which is an object)
 				try {
@@ -478,7 +496,7 @@ public class Server {
 				// the messaage part of the ChatMessage
 				String message="decryption went wrong";
 				try {
-					message=null;
+					//message=null;
 					message = new String(aes.decrypt(cm.getMessage()));
 				} catch (InvalidKeyException | IllegalStateException
 						| IllegalBlockSizeException | BadPaddingException
@@ -516,10 +534,36 @@ public class Server {
 		
 
 		private boolean CertifiacteValidAndVerified(X509Certificate clientCert) {
-			// TODO Auto-generated method stub
 			
-			return false;
-		}
+				// TODO Auto-generated method stub
+				try {
+					clientCert.checkValidity();
+				} catch (CertificateExpiredException | CertificateNotYetValidException e) {
+					// TODO Auto-generated catch block
+					return false;
+				} 
+				try {
+					Principal p=clientCert.getSubjectDN();
+					String owner=p.getName();
+					
+						if(owner.endsWith("1")){
+							clientCert.verify(serverKeystore.getCertificate("client1").getPublicKey());
+						}else{
+							clientCert.verify(serverKeystore.getCertificate("client2").getPublicKey());
+						}
+					
+					
+				} catch (InvalidKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException | SignatureException e) {
+					// TODO Auto-generated catch block
+					return false;
+				} catch (KeyStoreException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} 
+				return true;
+			}
+		
+
 
 		// try to close everything
 		private void close() {

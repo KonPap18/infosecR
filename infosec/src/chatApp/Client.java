@@ -18,6 +18,8 @@ import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.SignatureException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
@@ -105,13 +107,12 @@ public class Client {
 	private void loadKeystore() {
 		// TODO Auto-generated method stub
 		FileInputStream f;
-		if(username.substring(username.length() - 1,
-				username.length()).equals("1")){
+		if(username.endsWith("1")){
 			isClient1=true;
 			try {
 			 f= new FileInputStream("client1keystore");
-				KeyStore ks = KeyStore.getInstance("JKS");
-				ks.load(f, keystorePass2);
+				clientKeystore = KeyStore.getInstance("JKS");
+				clientKeystore.load(f, keystorePass1);
 				f.close();
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
@@ -195,9 +196,7 @@ public class Client {
 			return false;
 		}
 
-		String msg = "Connection accepted " + socket.getInetAddress() + ":"
-				+ socket.getPort();
-		display(msg);
+		
 
 		/* Creating both Data Stream */
 		try {
@@ -214,6 +213,9 @@ public class Client {
 		// will send as a String. All other messages will be ChatMessage objects
 		
 		if(trustedconnection){
+			String msg = "Connection accepted " + socket.getInetAddress() + ":"
+					+ socket.getPort();
+			display(msg);
 			
 			aes=new AES(secKey);
 		try {
@@ -402,7 +404,7 @@ public class Client {
 			// sOutput.writeObject(this.);
 			try {
 				ServerCert = (X509Certificate) sInput.readObject();// diavazoume
-				System.out.println("CLIENT SIDE, WRITING SERVER'S CERTIFICATE \n "+ServerCert.toString());													// to
+				System.out.println("CLIENT SIDE, WRITING SERVER'S CERTIFICATE \n "+ServerCert.getSubjectDN().getName());													// to
 																	// pistopoiitiko
 																	// tou
 																	// server
@@ -411,25 +413,21 @@ public class Client {
 				e.printStackTrace();
 			}
 			// System.out.println(ServerCert.toString());
-			try {
-				ServerCert.checkValidity(new Date());// tsekaroume oti einai se
-														// isxu
-			} catch (CertificateExpiredException
-					| CertificateNotYetValidException r) {
-				System.out.println("Invalid Certificate");
-
-			}
-			certok = true;// an ftasei mexri edw kai einai se isxu tou server mporoume na
+			
+			certok = CertValidAndVerified(ServerCert);// an ftasei mexri edw kai einai se isxu tou server mporoume na
 			if(certok){				// arxisoume tin epikonwnia kai na steiloume to diko mas
 				try {
-					sOutput.writeObject(ClientCertificate);
+					sOutput.writeObject(clientKeystore.getCertificate("client"));
 	
 				} catch (IOException e1) {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
+				} catch (KeyStoreException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
 			}else{
-				//display("Server says:Not trusted connection");
+				
 				 JOptionPane.showMessageDialog(null, "Server not trusted", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
 			
 					
@@ -454,6 +452,7 @@ public class Client {
 				// X509Certificate cer=null;
 				// msg =" ";
 				try {
+					
 					byte[] msg =aes.decrypt(((String) sInput.readObject()).getBytes());
 
 					// if console mode print the message and add back the prompt
@@ -492,5 +491,30 @@ public class Client {
 				}
 			}
 		}
+	}
+
+	private boolean CertValidAndVerified(X509Certificate serverCert) {
+		// TODO Auto-generated method stub
+		try {
+			serverCert.checkValidity();
+		} catch (CertificateExpiredException | CertificateNotYetValidException e) {
+			// TODO Auto-generated catch block
+			//System.out.println()
+			return false;
+		} 
+		try {
+			System.out.println(serverCert.getSigAlgName());
+			System.out.println(((X509Certificate) clientKeystore.getCertificate("server")).getSigAlgName());
+			serverCert.verify(clientKeystore.getCertificate("server").getPublicKey(), "SHA256withRSA");
+		} catch (InvalidKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException | SignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.out.println("not verified MALAKA");
+			return false;
+		} catch (KeyStoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+		return true;
 	}
 }
