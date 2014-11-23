@@ -26,16 +26,26 @@ public class ChatMessage implements Serializable {
 	
 	
 	// constructor
-	ChatMessage(int type, String message) {
+	/*ChatMessage(int type, String message) {
 		this.type = type;
 		this.message = message;
+	}*/
+	ChatMessage(int type, byte[] encrypted) {
+		this.type = type;
+		this.encrypted = encrypted;
 	}
 	
 	// getters
 	int getType() {
 		return type;
 	}
-	String getMessage() {
-		return message;
+	byte[] getMessage() {
+		return encrypted;
+	}
+	public String toString(){
+		return new String(encrypted);
+	}
+	void setMessage(byte[] msg){
+		encrypted=msg;
 	}
 }

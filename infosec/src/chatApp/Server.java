@@ -13,6 +13,7 @@ import java.io.ObjectOutputStream;
 import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -31,10 +32,18 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
+
+import crypto.AES;
+
 /*
  * The server that can be run both as a console application or a GUI
  */
 public class Server {
+	private static final char[] keystorePass = "Serverpass".toCharArray();
 	// a unique ID for each connection
 	private static int uniqueId;
 	// an ArrayList to keep the list of the Client
@@ -53,6 +62,7 @@ public class Server {
 	private X509Certificate ClientCertificate1;
 	private X509Certificate ClientCertificate2;
 	private KeyStore serverKeystore;
+	private SecretKeySpec secKey;
 	static X509Certificate ServerCertificate;
 	/*
 	 *  server constructor that receive the port to listen to for connection as parameter
@@ -72,24 +82,37 @@ public class Server {
 		// ArrayList for the Client list
 		al = new ArrayList<ClientThread>();
 		loadKeystore();
-		try {
-			//ServerPublicKey= readPublicKey("public0.key");
-			ServerPrivateKey=readPrivateKey("private0.key");
-			//System.out.println(ServerPrivateKey);
-			ServerCertificate=readCert("Server.cer");
-			//System.out.println(ServerCertificate.toString());
-			
-		} catch (NoSuchAlgorithmException | IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		//System.out.println(ServerPublicKey.toString());
+		secKey=new SecretKeySpec("+^\"%rjE+A-mnh".getBytes(), "AES");
 		
 	}
 	
 	private void loadKeystore() {
-		// TODO Auto-generated method stub
+		
+			// TODO Auto-generated method stub
+			FileInputStream f;
+			
+				try {
+				 f= new FileInputStream("Serverkeystore");
+					KeyStore ks = KeyStore.getInstance("JKS");
+					ks.load(f, keystorePass);
+					f.close();
+				} catch (FileNotFoundException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (KeyStoreException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NoSuchAlgorithmException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (CertificateException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+		/*// TODO Auto-generated method stub
 		// TODO Auto-generated method stub
 				ServerCertificate = readCert("Server.cer");
 				try {
@@ -125,7 +148,7 @@ public class Server {
 				} catch (KeyStoreException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-				}		
+				}		*/
 				
 				
 		
@@ -374,6 +397,9 @@ public class Server {
 		ChatMessage cm;
 		// the date I connect
 		String date;
+		private SecretKeySpec secKey;
+		private AES aes;
+		
 
 		// Constructore
 		ClientThread(Socket socket) {
@@ -383,6 +409,7 @@ public class Server {
 			this.socket = socket;
 			/* Creating both Data Stream */
 			System.out.println("Thread trying to create Object Input/Output Streams");
+			secKey=new SecretKeySpec("+^\"%rjE+A-mnh".getBytes(), "AES");
 			try
 			{
 				// create output first
@@ -416,10 +443,11 @@ public class Server {
 				e1.printStackTrace();
 			}
 			System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.toString());
-			if(CertifiacteValid(ClientCert)){
+			if(CertifiacteValidAndVerified(ClientCert)){
 				keepGoing=true;
 				try {
 					sOutput.writeBoolean(true);
+					aes=new AES(secKey);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -448,7 +476,16 @@ public class Server {
 					break;
 				}
 				// the messaage part of the ChatMessage
-				String message = cm.getMessage();
+				String message="decryption went wrong";
+				try {
+					message=null;
+					message = new String(aes.decrypt(cm.getMessage()));
+				} catch (InvalidKeyException | IllegalStateException
+						| IllegalBlockSizeException | BadPaddingException
+						| NoSuchAlgorithmException | NoSuchPaddingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 
 				// Switch on the type of message receive
 				switch(cm.getType()) {
@@ -478,8 +515,9 @@ public class Server {
 		
 		
 
-		private boolean CertifiacteValid(X509Certificate clientCert) {
+		private boolean CertifiacteValidAndVerified(X509Certificate clientCert) {
 			// TODO Auto-generated method stub
+			
 			return false;
 		}
 
@@ -508,17 +546,38 @@ public class Server {
 			if(!socket.isConnected()) {
 				close();
 				return false;
-			}
-			// write the message to the stream
+
+			
+			}// write the message to the stream
 			try {
-				sOutput.writeObject(msg);
+				sOutput.writeObject(aes.encrypt(msg));
 			}
 			// if an error occurs, do not abort just inform the user
 			catch(IOException e) {
 				display("Error sending message to " + username);
 				display(e.toString());
+			} catch (InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (NoSuchPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IllegalStateException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IllegalBlockSizeException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (BadPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 			return true;
 		}
 	}
 }
+
+

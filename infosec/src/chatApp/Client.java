@@ -13,9 +13,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyStore;
-import java.security.KeyStore.TrustedCertificateEntry;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
@@ -30,7 +30,14 @@ import java.security.spec.RSAPrivateKeySpec;
 import java.util.Date;
 import java.util.Scanner;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
 import javax.swing.JOptionPane;
+
+import crypto.AES;
 
 /*
  * The Client that can be run both as a console or a GUI
@@ -60,7 +67,10 @@ public class Client {
 	private boolean trustedconnection;
 	public Object infoMessage;
 	public String titleBar;
-
+	
+	private AES aes=null;
+	private SecretKeySpec secKey;
+	
 	/*
 	 * Constructor called by console mode server: the server address port: the
 	 * port number username: the username
@@ -89,7 +99,7 @@ public class Client {
 		this.cg = cg;
 		loadKeystore();
 		trustedconnection=false;
-
+		secKey=new SecretKeySpec("+^\"%rjE+A-mnh".getBytes(), "AES");
 	}
 
 	private void loadKeystore() {
@@ -146,47 +156,6 @@ public class Client {
 		}
 		
 		
-		/*ServerCertificate = readCert("Server.cer");
-		try {
-			ClientPrivateKey = readPrivateKey("private"
-					+ username.substring(username.length() - 1,
-							username.length()) + ".key");
-			System.out.println(ClientPrivateKey.toString());
-		} catch (NoSuchAlgorithmException | IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		ClientCertificate = readCert("Client"
-				+ username.substring(username.length() - 1, username.length())
-				+ ".cer");
-		Certificate[] certificatechain = new Certificate[1];
-		try {
-			clientKeystore = KeyStore.getInstance(KeyStore.getDefaultType());
-			clientKeystore.load(null);
-		} catch (KeyStoreException | NoSuchAlgorithmException
-				| CertificateException | IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		try {
-			TrustedCertificateEntry serveren = new TrustedCertificateEntry(
-					ServerCertificate);
-
-			clientKeystore.setKeyEntry(
-					"Client"
-							+ username.substring(username.length() - 1,
-									username.length()) + "key",
-					ClientPrivateKey, "123456".toCharArray(), certificatechain);
-			clientKeystore.setCertificateEntry(
-					"Client"
-							+ username.substring(username.length() - 1,
-									username.length()), ClientCertificate);
-			clientKeystore.setEntry("Server", serveren, null);
-		} catch (KeyStoreException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
-
 	}
 
 	private X509Certificate readCert(String filename) {
@@ -245,8 +214,10 @@ public class Client {
 		// will send as a String. All other messages will be ChatMessage objects
 		
 		if(trustedconnection){
+			
+			aes=new AES(secKey);
 		try {
-
+			
 			sOutput.writeObject(username);
 
 		} catch (IOException eIO) {
@@ -273,10 +244,11 @@ public class Client {
 	/*
 	 * To send a message to the server
 	 */
-	void sendMessage(ChatMessage msg) {
+	void sendMessage(ChatMessage cmsg) {
 		try {
-			sOutput.writeObject(msg);
-		} catch (IOException e) {
+			cmsg.setMessage(aes.encrypt(cmsg.getMessage()));
+			sOutput.writeObject(cmsg);
+		} catch (IOException | InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException | IllegalStateException | IllegalBlockSizeException | BadPaddingException e) {
 			display("Exception writing to server: " + e);
 		}
 	}
@@ -355,6 +327,7 @@ public class Client {
 		int portNumber = 1500;
 		String serverAddress = "localhost";
 		String userName = "Anonymous";
+		
 
 		// depending of the number of arguments provided we fall through
 		switch (args.length) {
@@ -390,7 +363,7 @@ public class Client {
 		// if it failed nothing we can do
 		if (!client.start())
 			return;
-
+		
 		// wait for messages from user
 		Scanner scan = new Scanner(System.in);
 		// loop forever for message from the user
@@ -398,17 +371,18 @@ public class Client {
 			System.out.print("> ");
 			// read message from user
 			String msg = scan.nextLine();
+			
 			// logout if message is LOGOUT
 			if (msg.equalsIgnoreCase("LOGOUT")) {
-				client.sendMessage(new ChatMessage(ChatMessage.LOGOUT, ""));
+				client.sendMessage(new ChatMessage(ChatMessage.LOGOUT, "".getBytes()));
 				// break to do the disconnect
 				break;
 			}
 			// message WhoIsIn
 			else if (msg.equalsIgnoreCase("WHOISIN")) {
-				client.sendMessage(new ChatMessage(ChatMessage.WHOISIN, ""));
+				client.sendMessage(new ChatMessage(ChatMessage.WHOISIN, "".getBytes()));
 			} else { // default to ordinary message
-				client.sendMessage(new ChatMessage(ChatMessage.MESSAGE, msg));
+				client.sendMessage(new ChatMessage(ChatMessage.MESSAGE, msg.getBytes()));
 			}
 		}
 		// done disconnect
@@ -480,14 +454,14 @@ public class Client {
 				// X509Certificate cer=null;
 				// msg =" ";
 				try {
-					String msg = (String) sInput.readObject();
+					byte[] msg =aes.decrypt(((String) sInput.readObject()).getBytes());
 
 					// if console mode print the message and add back the prompt
 					if (cg == null) {
-						System.out.println(msg);
+						System.out.println(msg.toString());
 						System.out.print("> ");
 					} else {
-						cg.append(msg);
+						cg.append(msg.toString());
 					}
 				} catch (IOException e) {
 					display("Server has close the connection: " + e);
@@ -497,6 +471,24 @@ public class Client {
 				}
 				// can't happen with a String object but need the catch anyhow
 				catch (ClassNotFoundException e2) {
+				} catch (InvalidKeyException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IllegalStateException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IllegalBlockSizeException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BadPaddingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NoSuchAlgorithmException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NoSuchPaddingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
 			}
 		}
