@@ -110,7 +110,8 @@ public class Client {
 		if(username.endsWith("1")){
 			isClient1=true;
 			try {
-			 f= new FileInputStream("client1keystore");
+			 f= new FileInputStream("client1Keystore.jks");
+			 System.out.println("fortwse client1 ");
 				clientKeystore = KeyStore.getInstance("JKS");
 				clientKeystore.load(f, keystorePass1);
 				f.close();
@@ -134,9 +135,10 @@ public class Client {
 		}else{
 			isClient1=false;
 			try {
-				f = new FileInputStream("client2keystore");
-				KeyStore ks = KeyStore.getInstance("JKS");
-				ks.load(f, keystorePass2);
+				f = new FileInputStream("client2Keystore.jks");
+				clientKeystore = KeyStore.getInstance("JKS");
+				clientKeystore.load(f, keystorePass2);
+				//System.out.println("printing in method load\n"+clientKeystore.getCertificate("server"));
 				f.close();
 			} catch (FileNotFoundException e) {
 				// TODO Auto-generated catch block
@@ -248,7 +250,8 @@ public class Client {
 	 */
 	void sendMessage(ChatMessage cmsg) {
 		try {
-			cmsg.setMessage(aes.encrypt(cmsg.getMessage()));
+			byte[]	ToEncrypt=cmsg.getMessage();
+			cmsg.setMessage(aes.encrypt(ToEncrypt));
 			sOutput.writeObject(cmsg);
 		} catch (IOException | InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException | IllegalStateException | IllegalBlockSizeException | BadPaddingException e) {
 			display("Exception writing to server: " + e);
@@ -404,7 +407,7 @@ public class Client {
 			// sOutput.writeObject(this.);
 			try {
 				ServerCert = (X509Certificate) sInput.readObject();// diavazoume
-				System.out.println("CLIENT SIDE, WRITING SERVER'S CERTIFICATE \n "+ServerCert.getSubjectDN().getName());													// to
+				//System.out.println("CLIENT SIDE, WRITING SERVER'S CERTIFICATE \n "+ServerCert.getSubjectDN().getName());													// to
 																	// pistopoiitiko
 																	// tou
 																	// server
@@ -412,8 +415,14 @@ public class Client {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			// System.out.println(ServerCert.toString());
-			
+			//System.out.println(ServerCert.toString());
+			/*try {
+				System.out.println(clientKeystore.getCertificate("server"));
+			} catch (KeyStoreException e3) {
+				// TODO Auto-generated catch block
+				e3.printStackTrace();
+			}
+			System.out.println(ServerCert.getSignature());*/
 			certok = CertValidAndVerified(ServerCert);// an ftasei mexri edw kai einai se isxu tou server mporoume na
 			if(certok){				// arxisoume tin epikonwnia kai na steiloume to diko mas
 				try {
@@ -503,9 +512,9 @@ public class Client {
 			return false;
 		} 
 		try {
-			System.out.println(serverCert.getSigAlgName());
-			System.out.println(((X509Certificate) clientKeystore.getCertificate("server")).getSigAlgName());
-			serverCert.verify(clientKeystore.getCertificate("server").getPublicKey(), "SHA256withRSA");
+			
+			
+			serverCert.verify(clientKeystore.getCertificate("server").getPublicKey());
 		} catch (InvalidKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException | SignatureException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

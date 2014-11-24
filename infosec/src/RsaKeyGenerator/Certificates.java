@@ -7,6 +7,7 @@ import java.security.Key;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
@@ -18,14 +19,15 @@ public class Certificates {
 		// TODO Auto-generated method stub
 		
 		try {
-			FileInputStream f = new FileInputStream("client1keystore");
+			FileInputStream f = new FileInputStream("client2Keystore.jks");
 			KeyStore ks = KeyStore.getInstance("JKS");
-			ks.load(f, "client1pass".toCharArray());
-			X509Certificate cer=(X509Certificate) ks.getCertificate("client1");
-			System.out.println(cer.toString());
-			Key k=ks.getKey("client1", "client1pass".toCharArray());
-			//System.out.println(((RSAPrivateKey)k).getPrivateExponent()+" \n"+((RSAPrivateKey)k).getModulus());
-			System.out.println(ks.getCertificate("Server").getPublicKey());
+			ks.load(f, "client2pass".toCharArray());
+			X509Certificate cer=(X509Certificate) ks.getCertificate("server");
+			
+			//PrivateKey k=(PrivateKey) ks.getKey("selfsigned", "serverpass".toCharArray());		
+			//System.out.println(k);
+			System.out.println(cer);
+			
 			try{
 				cer.verify(cer.getPublicKey());
 			
@@ -47,9 +49,6 @@ public class Certificates {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UnrecoverableKeyException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

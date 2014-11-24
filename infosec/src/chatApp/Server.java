@@ -13,6 +13,7 @@ import java.io.ObjectOutputStream;
 import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.KeyStore;
@@ -96,7 +97,7 @@ public class Server {
 			FileInputStream f;
 			
 				try {
-				 f= new FileInputStream("Serverkeystore");
+				 f= new FileInputStream("serverkeystore.jks");
 					serverKeystore = KeyStore.getInstance("JKS");
 					serverKeystore.load(f, keystorePass);
 					f.close();
@@ -422,6 +423,7 @@ public class Server {
 				
 				try {
 					sOutput.writeObject(serverKeystore.getCertificate("server"));
+					//System.out.println(((X509Certificate) serverKeystore.getCertificate("server")).toString());
 				} catch (KeyStoreException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -449,17 +451,25 @@ public class Server {
 			
 			try {
 				ClientCert=(X509Certificate) sInput.readObject();
+				//System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.getSubjectDN().getName());
+			//	System.out.println(ClientCert.getSignature());
 			} catch (ClassNotFoundException | IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
-			System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.getSubjectDN().getName());
+			
 			if(CertifiacteValidAndVerified(ClientCert)){
 				keepGoing=true;
 				try {
+					
 					sOutput.writeBoolean(true);
 					aes=new AES(secKey);
+					username = (String) sInput.readObject();
+					display(username + " just connected.");
 				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (ClassNotFoundException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
@@ -468,19 +478,15 @@ public class Server {
 				display("Not trusted connection");
 				try {
 					sOutput.writeBoolean(false);
+					keepGoing=false;
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				
 			}
-			try {
-				username = (String) sInput.readObject();
-			} catch (ClassNotFoundException | IOException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-			display(username + " just connected.");
+			
+			
 			while(keepGoing) {
 				// read a String (which is an object)
 				try {
@@ -544,17 +550,20 @@ public class Server {
 				} 
 				try {
 					Principal p=clientCert.getSubjectDN();
-					String owner=p.getName();
+					String owner=p.getName().trim();
 					
 						if(owner.endsWith("1")){
+						//	System.out.println(((X509Certificate) serverKeystore.getCertificate("client1")).getSubjectDN());
 							clientCert.verify(serverKeystore.getCertificate("client1").getPublicKey());
 						}else{
+							System.out.println(((X509Certificate) serverKeystore.getCertificate("client2")).getSubjectDN());
 							clientCert.verify(serverKeystore.getCertificate("client2").getPublicKey());
 						}
 					
 					
 				} catch (InvalidKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException | SignatureException e) {
 					// TODO Auto-generated catch block
+					e.printStackTrace();
 					return false;
 				} catch (KeyStoreException e) {
 					// TODO Auto-generated catch block
