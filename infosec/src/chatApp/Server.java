@@ -21,7 +21,9 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Principal;
+import java.security.PrivateKey;
 import java.security.SignatureException;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
@@ -38,11 +40,15 @@ import java.util.ArrayList;
 import java.util.Date;
 
 import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 import crypto.AES;
+import crypto.RSA;
 
 /*
  * The server that can be run both as a console application or a GUI
@@ -87,7 +93,7 @@ public class Server {
 		// ArrayList for the Client list
 		al = new ArrayList<ClientThread>();
 		loadKeystore();
-		secKey=new SecretKeySpec("+^\"%rjE+A-mnh".getBytes(), "AES");
+		
 		
 	}
 	
@@ -414,7 +420,7 @@ public class Server {
 			this.socket = socket;
 			/* Creating both Data Stream */
 			System.out.println("Thread trying to create Object Input/Output Streams");
-			secKey=new SecretKeySpec("+^\"%rjE+A-mnh".getBytes(), "AES");
+		
 			try
 			{
 				// create output first
@@ -431,12 +437,15 @@ public class Server {
 				
 				
 				// read the username
-				//username = (String) sInput.readObject();
-				//display(username + " just connected.");
+				username = (String) sInput.readObject();
+				//display(username + " is tryong to connect.");
 			}
 			catch (IOException e) {
 				display("Exception creating new Input/output Streams: " + e);
 				return;
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
             date = new Date().toString() + "\n";
 		}
@@ -463,16 +472,18 @@ public class Server {
 				try {
 					
 					sOutput.writeBoolean(true);
-					aes=new AES(secKey);
-					username = (String) sInput.readObject();
+					sOutput.flush();
+					
+					if(username.endsWith("1")){
+						keyAgreement((PrivateKey)serverKeystore.getKey("server", keystorePass), (X509Certificate) serverKeystore.getCertificate("client1"));
+					}else{
+						keyAgreement((PrivateKey)serverKeystore.getKey("server", keystorePass), (X509Certificate) serverKeystore.getCertificate("client2"));
+					}
 					display(username + " just connected.");
-				} catch (IOException e) {
+				} catch (IOException | InvalidKeyException | UnrecoverableKeyException | NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException | KeyStoreException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-				} catch (ClassNotFoundException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+				} 
 				
 			}else{
 				display("Not trusted connection");
@@ -552,11 +563,11 @@ public class Server {
 					Principal p=clientCert.getSubjectDN();
 					String owner=p.getName().trim();
 					
-						if(owner.endsWith("1")){
+						if(username.endsWith("1")){
 						//	System.out.println(((X509Certificate) serverKeystore.getCertificate("client1")).getSubjectDN());
 							clientCert.verify(serverKeystore.getCertificate("client1").getPublicKey());
 						}else{
-							System.out.println(((X509Certificate) serverKeystore.getCertificate("client2")).getSubjectDN());
+						//	System.out.println(((X509Certificate) serverKeystore.getCertificate("client2")).getSubjectDN());
 							clientCert.verify(serverKeystore.getCertificate("client2").getPublicKey());
 						}
 					
@@ -569,6 +580,7 @@ public class Server {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} 
+				System.out.println("Clients cert verified");
 				return true;
 			}
 		
@@ -630,6 +642,54 @@ public class Server {
 			}
 			return true;
 		}
+		private void keyAgreement(PrivateKey privkey, X509Certificate cert ) throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, IOException {
+			// TODO Auto-generated method stub
+			RSA localRSA=new RSA(cert, privkey);
+			RSA remoteRSA = null;
+			try {
+				if(username.endsWith("1")){
+					remoteRSA=new RSA((X509Certificate)serverKeystore.getCertificate("client1"), null);
+				}else{
+					remoteRSA=new RSA((X509Certificate)serverKeystore.getCertificate("client2"), null);
+				}
+			
+				
+			} catch (KeyStoreException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			KeyGenerator keygen=KeyGenerator.getInstance("AES");
+			keygen.init(128);
+			SecretKey sk=keygen.generateKey();
+			byte[] raw=sk.getEncoded();
+			SecretKeySpec s1=new SecretKeySpec(raw, "AES");
+			byte[] localHalf=s1.getEncoded();
+			//write our half
+			byte[] encryptedLocalHalf=remoteRSA.wrap(s1);
+			sOutput.writeInt(encryptedLocalHalf.length);
+			sOutput.write(encryptedLocalHalf);
+			sOutput.flush();
+			//get other side's half
+			int length = sInput.readInt();
+	        byte[] encryptedRemoteHalf = new byte[length];
+	        sInput.read(encryptedRemoteHalf);
+	        SecretKeySpec s2=(SecretKeySpec)localRSA.unwrap(encryptedRemoteHalf, "AES", Cipher.SECRET_KEY);
+	        byte[] remoteHalf=s2.getEncoded();
+	        //construct secret Key
+	        byte[] full=new byte[16];
+	        for (int i = 0; i < 8; i++) {
+	            full[i] = remoteHalf[i];
+	            full[8 + i] = localHalf[i];
+	        }
+	        SecretKeySpec secKey = new SecretKeySpec(full, "AES");
+	        System.out.println(secKey.getEncoded());
+	        aes=new AES(secKey);
+	        for (int i = 0; i < 16; i++) {
+	            full[i] = 0;
+	            localHalf[i] = 0;
+	            remoteHalf[i] = 0;
+	        }
+	}
 	}
 }
 
