@@ -166,94 +166,6 @@ public class Server {
 		
 	}
 
-	private X509Certificate readCert(String filename) {
-		// TODO Auto-generated method stub
-		FileInputStream fis;
-		BufferedInputStream bis=null;
-		try {
-			fis = new FileInputStream(filename);
-			 bis= new BufferedInputStream(fis);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		 
-
-		 CertificateFactory cf;
-		  Certificate cert=null;
-		try {
-			cf = CertificateFactory.getInstance("X.509");			
-			    cert = cf.generateCertificate(bis);
-//			    System.out.println("2");
-			    //System.out.println(cert.toString());
-		
-		}catch (CertificateException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-			
-		
-		return (X509Certificate) cert;
-	}
-
-	private RSAPrivateKey readPrivateKey(String fileName) throws FileNotFoundException,
-			IOException,
-			NoSuchAlgorithmException {
-		// TODO Auto-generated method stub
-		 ObjectInputStream oin = new ObjectInputStream(
-				    new BufferedInputStream(new FileInputStream(fileName)));
-		 BigInteger mod;
-		 BigInteger exp;
-		 try {
-			 mod=(BigInteger) oin.readObject();
-			 exp=(BigInteger) oin.readObject();
-		 }catch (Exception e) {
-			    throw new IOException("Unexpected error", e);
-		 } finally {
-		    oin.close();
-		 }
-		 KeyFactory r=KeyFactory.getInstance("RSA");
-		 RSAPrivateKeySpec spec=new RSAPrivateKeySpec(mod, exp);
-		 RSAPrivateKey pk=null;
-		try {
-			pk = (RSAPrivateKey) r.generatePrivate(spec);
-		//	System.out.println(pk.toString());
-		} catch (InvalidKeySpecException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}		
-			return pk;
-			 
-		
-	}
-
-	private RSAPublicKey readPublicKey(String fileName) throws FileNotFoundException, IOException, NoSuchAlgorithmException {
-		// TODO Auto-generated method stub
-		 ObjectInputStream oin = new ObjectInputStream(
-				    new BufferedInputStream(new FileInputStream(fileName)));
-		 BigInteger mod;
-		 BigInteger exp;
-		 try {
-			 mod=(BigInteger) oin.readObject();
-			 exp=(BigInteger) oin.readObject();
-		 }catch (Exception e) {
-			    throw new IOException("Unexpected error", e);
-		 } finally {
-		    oin.close();
-		 }
-		 KeyFactory r=KeyFactory.getInstance("RSA");
-		 RSAPublicKeySpec spec=new RSAPublicKeySpec(mod, exp);
-		 RSAPublicKey pk=null;
-		try {
-			pk = (RSAPublicKey) r.generatePublic(spec);
-		//	System.out.println(pk.toString());
-		} catch (InvalidKeySpecException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}		
-			return pk;
-	}
-
 	public void start() {
 		keepGoing = true;
 		/* create socket server and wait for connection requests */
@@ -430,25 +342,12 @@ public class Server {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				
-				/*try {
-					sOutput.writeObject(serverKeystore.getCertificate("server"));
-					//System.out.println(((X509Certificate) serverKeystore.getCertificate("server")).toString());
-				} catch (KeyStoreException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}				
-				// read the username
-				username = (String) sInput.readObject();
-				//display(username + " is tryong to connect.");
-*/			}
+				
+			}
 			catch (IOException e) {
 				display("Exception creating new Input/output Streams: " + e);
 				return;
-			}/* catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}*/
-            //date = new Date().toString() + "\n";
+			}
 		}
 
 		// what will run forever
@@ -494,7 +393,7 @@ public class Server {
 					break;
 				}
 				// the messaage part of the ChatMessage
-				String message="decryption went wrong";
+				String message=null;
 				try {
 					//message=null;
 					message = new String(this.aes.decrypt(cm.getMessage()));
@@ -617,7 +516,7 @@ public class Server {
 
 			
 			}// write the message to the stream
-			
+			//System.out.println(msg);
 			try {
 				sOutput.writeObject(this.aes.encrypt(msg.getBytes()));
 			}

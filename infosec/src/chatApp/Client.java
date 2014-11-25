@@ -175,29 +175,7 @@ public class Client {
 		
 	}
 
-	private X509Certificate readCert(String filename) {
-		// TODO Auto-generated method stub
-		FileInputStream fis;
-		BufferedInputStream bis = null;
-		try {
-			fis = new FileInputStream(filename);
-			bis = new BufferedInputStream(fis);
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		CertificateFactory cf;
-		Certificate cert = null;
-		try {
-			cf = CertificateFactory.getInstance("X.509");
-			cert = cf.generateCertificate(bis);
-		} catch (CertificateException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return (X509Certificate) cert;
-	}
-
+	
 	/*
 	 * To start the dialog
 	 */
@@ -308,7 +286,9 @@ public class Client {
 	void sendMessage(ChatMessage cmsg) {
 		try {
 			byte[]	ToEncrypt=cmsg.getMessage();
+			System.out.println(new String(ToEncrypt, "UTF-8")+"PRIN TO KWDIKOPOISEI");
 			cmsg.setMessage(aes.encrypt(ToEncrypt));
+		
 			sOutput.writeObject(cmsg);
 		} catch (IOException | InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException | IllegalStateException | IllegalBlockSizeException | BadPaddingException e) {
 			display("Exception writing to server: " + e);
@@ -342,34 +322,7 @@ public class Client {
 
 	}
 
-	private RSAPrivateKey readPrivateKey(String fileName)
-			throws FileNotFoundException, IOException, NoSuchAlgorithmException {
-		// TODO Auto-generated method stub
-		ObjectInputStream oin = new ObjectInputStream(new BufferedInputStream(
-				new FileInputStream(fileName)));
-		BigInteger mod;
-		BigInteger exp;
-		try {
-			mod = (BigInteger) oin.readObject();
-			exp = (BigInteger) oin.readObject();
-		} catch (Exception e) {
-			throw new IOException("Unexpected error", e);
-		} finally {
-			oin.close();
-		}
-		KeyFactory r = KeyFactory.getInstance("RSA");
-		RSAPrivateKeySpec spec = new RSAPrivateKeySpec(mod, exp);
-		RSAPrivateKey pk = null;
-		try {
-			pk = (RSAPrivateKey) r.generatePrivate(spec);
-			// System.out.println(pk.toString());
-		} catch (InvalidKeySpecException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		return pk;
 
-	}
 
 	/*
 	 * To start the Client in console mode use one of the following command >
@@ -501,8 +454,9 @@ public class Client {
 				// msg =" ";
 				try {
 					
-					String msgS=new String((byte[]) sInput.readObject());
-					byte[] msg =aes.decrypt(msgS.getBytes());
+					byte[] msgS=(byte[]) sInput.readObject();
+				//	System.out.println(msgS+"PRIN TIN APOKWDIKOPOIISI");
+					byte[] msg =aes.decrypt(msgS);
 					String out=new String(msg, "UTF-8");
 					System.out.println(out);
 
