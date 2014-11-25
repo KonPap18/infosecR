@@ -47,6 +47,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.bouncycastle.util.encoders.Base64;
+
 import crypto.AES;
 import crypto.RSA;
 
@@ -72,8 +74,7 @@ public class Server {
 	RSAPrivateKey ServerPrivateKey;
 	private X509Certificate ClientCertificate1;
 	private X509Certificate ClientCertificate2;
-	private KeyStore serverKeystore;
-	private SecretKeySpec secKey;
+	private KeyStore serverKeystore;	
 	static X509Certificate ServerCertificate;
 	/*
 	 *  server constructor that receive the port to listen to for connection as parameter
@@ -410,6 +411,7 @@ public class Server {
 		String date;
 		private SecretKeySpec secKey;
 		private AES aes;
+		private boolean ServerTrustedConnection;
 		
 
 		// Constructore
@@ -420,6 +422,7 @@ public class Server {
 			this.socket = socket;
 			/* Creating both Data Stream */
 			System.out.println("Thread trying to create Object Input/Output Streams");
+			username=null;
 		
 			try
 			{
@@ -427,53 +430,42 @@ public class Server {
 				sOutput = new ObjectOutputStream(socket.getOutputStream());
 				sInput  = new ObjectInputStream(socket.getInputStream());
 				
-				try {
+				/*try {
 					sOutput.writeObject(serverKeystore.getCertificate("server"));
 					//System.out.println(((X509Certificate) serverKeystore.getCertificate("server")).toString());
 				} catch (KeyStoreException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-				}
-				
-				
+				}				
 				// read the username
 				username = (String) sInput.readObject();
 				//display(username + " is tryong to connect.");
-			}
+*/			}
 			catch (IOException e) {
 				display("Exception creating new Input/output Streams: " + e);
 				return;
-			} catch (ClassNotFoundException e) {
+			}/* catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
-            date = new Date().toString() + "\n";
+			}*/
+            //date = new Date().toString() + "\n";
 		}
 
 		// what will run forever
 		public void run() {
 			// to loop until LOGOUT
 			boolean keepGoing = false;
-			X509Certificate ClientCert=null;
-			
-			
-			
 			try {
-				ClientCert=(X509Certificate) sInput.readObject();
-				//System.out.println("SERVER SIDE WRITING CLIENT'S CERTIFICATE \n"+ClientCert.getSubjectDN().getName());
-			//	System.out.println(ClientCert.getSignature());
-			} catch (ClassNotFoundException | IOException e1) {
+				ServerTrustedConnection=handshake();
+			} catch (KeyStoreException | ClassNotFoundException | IOException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
-			
-			if(CertifiacteValidAndVerified(ClientCert)){
+				
+			if(ServerTrustedConnection){
 				keepGoing=true;
 				try {
-					
-					sOutput.writeBoolean(true);
-					sOutput.flush();
-					
+							
 					if(username.endsWith("1")){
 						keyAgreement((PrivateKey)serverKeystore.getKey("server", keystorePass), (X509Certificate) serverKeystore.getCertificate("client1"));
 					}else{
@@ -487,18 +479,9 @@ public class Server {
 				
 			}else{
 				display("Not trusted connection");
-				try {
-					sOutput.writeBoolean(false);
-					keepGoing=false;
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				
+					
 			}
-			
-			
-			while(keepGoing) {
+		while(keepGoing) {
 				// read a String (which is an object)
 				try {
 					cm = (ChatMessage) sInput.readObject();
@@ -514,7 +497,7 @@ public class Server {
 				String message="decryption went wrong";
 				try {
 					//message=null;
-					message = new String(aes.decrypt(cm.getMessage()));
+					message = new String(this.aes.decrypt(cm.getMessage()));
 				} catch (InvalidKeyException | IllegalStateException
 						| IllegalBlockSizeException | BadPaddingException
 						| NoSuchAlgorithmException | NoSuchPaddingException e) {
@@ -549,6 +532,25 @@ public class Server {
 		}
 		
 		
+
+		private boolean handshake() throws KeyStoreException, IOException, ClassNotFoundException {
+			// TODO Auto-generated method stub
+			X509Certificate ClientCert=null;
+			sOutput.writeObject(serverKeystore.getCertificate("server"));
+			username = (String) sInput.readObject();
+			//while(!(username==null)&&(ClientCert==null)){
+				ClientCert=(X509Certificate) sInput.readObject();				
+		//	}
+			if(CertifiacteValidAndVerified(ClientCert)){
+				sOutput.writeBoolean(true);
+				return true;
+			}else{
+				sOutput.writeBoolean(false);
+				
+				return false;
+			}
+			
+		}
 
 		private boolean CertifiacteValidAndVerified(X509Certificate clientCert) {
 			
@@ -610,12 +612,14 @@ public class Server {
 			// if Client is still connected send the message to it
 			if(!socket.isConnected()) {
 				close();
+				System.out.println("SOCKET CLOSED");
 				return false;
 
 			
 			}// write the message to the stream
+			
 			try {
-				sOutput.writeObject(aes.encrypt(msg));
+				sOutput.writeObject(this.aes.encrypt(msg.getBytes()));
 			}
 			// if an error occurs, do not abort just inform the user
 			catch(IOException e) {
@@ -646,6 +650,7 @@ public class Server {
 			// TODO Auto-generated method stub
 			RSA localRSA=new RSA(cert, privkey);
 			RSA remoteRSA = null;
+		//	System.out.println("Server before try");
 			try {
 				if(username.endsWith("1")){
 					remoteRSA=new RSA((X509Certificate)serverKeystore.getCertificate("client1"), null);
@@ -663,6 +668,7 @@ public class Server {
 			SecretKey sk=keygen.generateKey();
 			byte[] raw=sk.getEncoded();
 			SecretKeySpec s1=new SecretKeySpec(raw, "AES");
+			//System.out.println(s1.getEncoded());
 			byte[] localHalf=s1.getEncoded();
 			//write our half
 			byte[] encryptedLocalHalf=remoteRSA.wrap(s1);
@@ -674,6 +680,7 @@ public class Server {
 	        byte[] encryptedRemoteHalf = new byte[length];
 	        sInput.read(encryptedRemoteHalf);
 	        SecretKeySpec s2=(SecretKeySpec)localRSA.unwrap(encryptedRemoteHalf, "AES", Cipher.SECRET_KEY);
+	       // System.out.println(s2.getEncoded());
 	        byte[] remoteHalf=s2.getEncoded();
 	        //construct secret Key
 	        byte[] full=new byte[16];
@@ -681,14 +688,17 @@ public class Server {
 	            full[i] = remoteHalf[i];
 	            full[8 + i] = localHalf[i];
 	        }
-	        SecretKeySpec secKey = new SecretKeySpec(full, "AES");
-	        System.out.println(secKey.getEncoded());
+	        secKey = new SecretKeySpec(full, "AES");
+	    //    System.out.println(Base64.toBase64String(secKey.getEncoded()));
 	        aes=new AES(secKey);
 	        for (int i = 0; i < 16; i++) {
 	            full[i] = 0;
 	            localHalf[i] = 0;
 	            remoteHalf[i] = 0;
 	        }
+	        s1 = new SecretKeySpec(full, "AES");
+	        s2 = new SecretKeySpec(full, "AES");
+	       secKey = new SecretKeySpec(full, "AES");
 	}
 	}
 }

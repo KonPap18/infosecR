@@ -45,7 +45,11 @@ public class ChatMessage implements Serializable {
 	public String toString(){
 		return new String(encrypted);
 	}
-	void setMessage(byte[] msg){
+	void setMessage(byte[] msg, int length){
+		encrypted=new byte[length];
+		encrypted=msg;
+	}
+	void setMessage(byte[] msg){		
 		encrypted=msg;
 	}
 }

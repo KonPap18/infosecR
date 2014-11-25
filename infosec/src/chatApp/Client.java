@@ -20,7 +20,6 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
@@ -32,6 +31,7 @@ import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.RSAPrivateKeySpec;
+import java.util.Arrays;
 import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
@@ -42,6 +42,9 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.swing.JOptionPane;
+
+import org.bouncycastle.util.encoders.Base64;
+import org.bouncycastle.util.encoders.Base64Encoder;
 
 import crypto.AES;
 import crypto.RSA;
@@ -72,7 +75,7 @@ public class Client {
 	private X509Certificate ServerCertificate;
 	private KeyStore clientKeystore;
 	private char[] keystorePassword;
-	private boolean trustedconnection;
+	private boolean ClientTrustedConnection;
 	
 	public Object infoMessage;
 	public String titleBar;
@@ -108,7 +111,7 @@ public class Client {
 		// save if we are in GUI mode or not
 		this.cg = cg;
 		loadKeystore();
-		trustedconnection=false;
+		ClientTrustedConnection=false;
 		keyAgreed=false;
 		
 	}
@@ -219,45 +222,14 @@ public class Client {
 			display("Exception creating new Input/output Streams: " + eIO);
 			return false;
 		}
-
+		
 		// creates the Thread to listen from the server
 		new ListenFromServer().start();
 		// Send our username to the server this is the only message that we
 		// will send as a String. All other messages will be ChatMessage objects
-		try {
-			sOutput.writeObject(username);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			return false;
-		}
 		
-		if(trustedconnection){
-			String msg = "Connection accepted " + socket.getInetAddress() + ":"
-					+ socket.getPort();
-			display(msg);	
-			
-			try {
-				try {
-					keyAgreement((PrivateKey) clientKeystore.getKey("client", keystorePassword), (X509Certificate) (clientKeystore.getCertificate("client")));
-					keyAgreed=true;
-				} catch (InvalidKeyException | NoSuchPaddingException
-						| IllegalBlockSizeException | IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			} catch (UnrecoverableKeyException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (KeyStoreException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchAlgorithmException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
 			//aes=new AES(secKey);
-		}
+	
 		// success we inform the caller that it worked
 		return true;
 	}
@@ -266,6 +238,7 @@ public class Client {
 		// TODO Auto-generated method stub
 		RSA localRSA=new RSA(cert, privkey);
 		RSA remoteRSA = null;
+	//	System.out.println("Client before try");
 		try {
 			remoteRSA=new RSA((X509Certificate)clientKeystore.getCertificate("server"), null);
 		} catch (KeyStoreException e) {
@@ -277,6 +250,7 @@ public class Client {
 		SecretKey sk=keygen.generateKey();
 		byte[] raw=sk.getEncoded();
 		SecretKeySpec s1=new SecretKeySpec(raw, "AES");
+		//System.out.println(s1.getEncoded());
 		byte[] localHalf=s1.getEncoded();
 		//write our half
 		byte[] encryptedLocalHalf=remoteRSA.wrap(s1);
@@ -288,6 +262,7 @@ public class Client {
         byte[] encryptedRemoteHalf = new byte[length];
         sInput.read(encryptedRemoteHalf);
         SecretKeySpec s2=(SecretKeySpec)localRSA.unwrap(encryptedRemoteHalf, "AES", Cipher.SECRET_KEY);
+       // System.out.println(s2.getEncoded());
         byte[] remoteHalf=s2.getEncoded();
         //construct secret Key
         byte[] full=new byte[16];
@@ -295,8 +270,8 @@ public class Client {
             full[i] = localHalf[i];
             full[8 + i] = remoteHalf[i];
         }
-        SecretKeySpec secKey = new SecretKeySpec(full, "AES");
-        System.out.println(secKey.getEncoded());
+        secKey = new SecretKeySpec(full, "AES");
+       // System.out.println(Base64.toBase64String(secKey.getEncoded()));
         aes=new AES(secKey);
         for (int i = 0; i < 16; i++) {
             full[i] = 0;
@@ -304,7 +279,9 @@ public class Client {
             remoteHalf[i] = 0;
         }
         
-        
+        s1 = new SecretKeySpec(full, "AES");
+        s2 = new SecretKeySpec(full, "AES");
+       secKey = new SecretKeySpec(full, "AES");
         
         
         
@@ -482,80 +459,59 @@ public class Client {
 	class ListenFromServer extends Thread {
 
 		public void run() {
-			X509Certificate ServerCert = null;
+			
 			boolean certok = false;
-			// sOutput.writeObject(this.);
 			try {
-				ServerCert = (X509Certificate) sInput.readObject();// diavazoume
-				//System.out.println("CLIENT SIDE, WRITING SERVER'S CERTIFICATE \n "+ServerCert.getSubjectDN().getName());													// to
-																	// pistopoiitiko
-																	// tou
-																	// server
-			} catch (IOException | ClassNotFoundException e) {
+				ClientTrustedConnection=handshake();
+			} catch (ClassNotFoundException e1) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			//System.out.println(ServerCert.toString());
-			/*try {
-				System.out.println(clientKeystore.getCertificate("server"));
-			} catch (KeyStoreException e3) {
+				e1.printStackTrace();
+			} catch (KeyStoreException e1) {
 				// TODO Auto-generated catch block
-				e3.printStackTrace();
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
 			}
-			System.out.println(ServerCert.getSignature());*/
-			certok = CertValidAndVerified(ServerCert);// an ftasei mexri edw kai einai se isxu tou server mporoume na
-			if(certok){				// arxisoume tin epikonwnia kai na steiloume to diko mas
-				try {
-					sOutput.writeObject(clientKeystore.getCertificate("client"));
 	
-				} catch (IOException e1) {
+			if(ClientTrustedConnection){
+				String msg = "Connection accepted " + socket.getInetAddress() + ":"
+						+ socket.getPort();
+				display(msg);	
+				try {
+					keyAgreement((PrivateKey) clientKeystore.getKey("client", keystorePassword), (X509Certificate) (clientKeystore.getCertificate("client")));
+					keyAgreed=true;
+				} catch (InvalidKeyException | NoSuchPaddingException
+						| IllegalBlockSizeException | IOException e) {
 					// TODO Auto-generated catch block
-					e1.printStackTrace();
+					e.printStackTrace();
+				} catch (UnrecoverableKeyException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NoSuchAlgorithmException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				} catch (KeyStoreException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-			}else{
-				
-				 JOptionPane.showMessageDialog(null, "Server not trusted", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
-			
-					
-					System.exit(0);
 			}
-			try {
-				trustedconnection=sInput.readBoolean();
-			} catch (IOException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-				
-			}
-			if(!trustedconnection){
-				//display("Server says:Not trusted connection");
-				 JOptionPane.showMessageDialog(null, "Server says:Not trusted connection", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
-			
-					
-					System.exit(0);
-			
-			}			
-			try {
-				sOutput.flush();
-			} catch (IOException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-			while (trustedconnection&&keyAgreed) {
+			while (ClientTrustedConnection&&keyAgreed) {
 				// X509Certificate cer=null;
 				// msg =" ";
 				try {
 					
-					byte[] msg =aes.decrypt(((String) sInput.readObject()).getBytes());
+					String msgS=new String((byte[]) sInput.readObject());
+					byte[] msg =aes.decrypt(msgS.getBytes());
+					String out=new String(msg, "UTF-8");
+					System.out.println(out);
 
 					// if console mode print the message and add back the prompt
 					if (cg == null) {
-						System.out.println(msg.toString());
+						System.out.println(out);
 						System.out.print("> ");
 					} else {
-						cg.append(msg.toString());
+						cg.append(out);
 					}
 				} catch (IOException e) {
 					display("Server has close the connection: " + e);
@@ -585,6 +541,31 @@ public class Client {
 					e.printStackTrace();
 				}
 			}
+		}
+
+		private boolean handshake() throws IOException, ClassNotFoundException, KeyStoreException {
+			// TODO Auto-generated method stub
+			boolean ok=false;
+			X509Certificate ServerCert = (X509Certificate) sInput.readObject();
+			if(CertValidAndVerified(ServerCert)){
+				sOutput.writeObject(username);
+				sOutput.flush();
+				sOutput.writeObject(clientKeystore.getCertificate("client"));				
+			}else{
+				JOptionPane.showMessageDialog(null, "Server not trusted", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
+				System.exit(0);
+				return false;
+			}
+			
+			ok=sInput.readBoolean();
+			if(ok){
+				return true;
+			}else{
+				 JOptionPane.showMessageDialog(null, "Server says:Not trusted connection", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
+				 System.exit(0);
+				 return false;
+			}
+			
 		}
 	}
 

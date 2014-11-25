@@ -37,7 +37,8 @@ public class AES
     
     public byte[] decrypt(byte[] input) throws IllegalStateException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException
     {
-        Cipher aesCipher = Cipher.getInstance("AES");
+        System.out.println(input.toString());
+    	Cipher aesCipher = Cipher.getInstance("AES");
         aesCipher.init(Cipher.DECRYPT_MODE, secKey);
         
         return aesCipher.doFinal(input);

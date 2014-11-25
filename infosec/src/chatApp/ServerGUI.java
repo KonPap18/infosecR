@@ -65,8 +65,7 @@ public class ServerGUI extends JFrame implements ActionListener, WindowListener 
 	}
 	void appendEvent(String str) {
 		event.append(str);
-		event.setCaretPosition(chat.getText().length() - 1);
-		
+		event.setCaretPosition(chat.getText().length() - 1);		
 	}
 	
 	// start or stop where clicked
