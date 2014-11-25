@@ -286,7 +286,7 @@ public class Client {
 	void sendMessage(ChatMessage cmsg) {
 		try {
 			byte[]	ToEncrypt=cmsg.getMessage();
-			System.out.println(new String(ToEncrypt, "UTF-8")+"PRIN TO KWDIKOPOISEI");
+		//	System.out.println(new String(ToEncrypt, "UTF-8")+"PRIN TO KWDIKOPOISEI");
 			cmsg.setMessage(aes.encrypt(ToEncrypt));
 		
 			sOutput.writeObject(cmsg);
@@ -457,7 +457,7 @@ public class Client {
 					byte[] msgS=(byte[]) sInput.readObject();
 				//	System.out.println(msgS+"PRIN TIN APOKWDIKOPOIISI");
 					byte[] msg =aes.decrypt(msgS);
-					String out=new String(msg, "UTF-8");
+					String out=new String(msg, "ISO8859_7");
 					System.out.println(out);
 
 					// if console mode print the message and add back the prompt
