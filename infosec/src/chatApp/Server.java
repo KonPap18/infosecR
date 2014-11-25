@@ -4,37 +4,29 @@ package chatApp;
 /*
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
-import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 import java.security.InvalidKeyException;
-import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.RSAPrivateKeySpec;
-import java.security.spec.RSAPublicKeySpec;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -46,8 +38,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-
-import org.bouncycastle.util.encoders.Base64;
+import javax.swing.JOptionPane;
 
 import crypto.AES;
 import crypto.RSA;
@@ -324,10 +315,16 @@ public class Server {
 		private SecretKeySpec secKey;
 		private AES aes;
 		private boolean ServerTrustedConnection;
-		
+		private MessageDigest sha256;
 
 		// Constructore
 		ClientThread(Socket socket) {
+			try {
+				sha256=MessageDigest.getInstance("SHA-256");
+			} catch (NoSuchAlgorithmException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
 			
 			// a unique id
 			id = ++uniqueId;
@@ -403,6 +400,8 @@ public class Server {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				//byte [] messageDigest=sha256.digest(message.getBytes());
+				if(cm.checkDigest(sha256.digest(message.getBytes()))){
 
 				// Switch on the type of message receive
 				switch(cm.getType()) {
@@ -423,11 +422,15 @@ public class Server {
 					}
 					break;
 				}
+			}else{
+				JOptionPane.showMessageDialog(null, "Message altered", "InfoBox: " + "Digest error", JOptionPane.INFORMATION_MESSAGE);
 			}
 			// remove myself from the arrayList containing the list of the
 			// connected Clients
+		}
 			remove(id);
 			close();
+		
 		}
 		
 		
@@ -518,7 +521,9 @@ public class Server {
 			}// write the message to the stream
 			//System.out.println(msg);
 			try {
-				sOutput.writeObject(this.aes.encrypt(msg.getBytes()));
+				ChatMessage toSend=new ChatMessage(ChatMessage.MESSAGE, this.aes.encrypt(msg.getBytes()));
+				toSend.setDigest(sha256.digest(msg.getBytes()));				
+				sOutput.writeObject(toSend);
 			}
 			// if an error occurs, do not abort just inform the user
 			catch(IOException e) {

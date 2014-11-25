@@ -5,33 +5,26 @@ package chatApp;
 /*
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
-import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.math.BigInteger;
 import java.net.Socket;
 import java.security.InvalidKeyException;
-import java.security.KeyFactory;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.RSAPrivateKeySpec;
-import java.util.Arrays;
 import java.util.Scanner;
 
 import javax.crypto.BadPaddingException;
@@ -42,9 +35,6 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.swing.JOptionPane;
-
-import org.bouncycastle.util.encoders.Base64;
-import org.bouncycastle.util.encoders.Base64Encoder;
 
 import crypto.AES;
 import crypto.RSA;
@@ -84,6 +74,7 @@ public class Client {
 	private SecretKeySpec secKey;
 	public boolean keyAgreed;
 	
+	private MessageDigest digest;
 	/*
 	 * Constructor called by console mode server: the server address port: the
 	 * port number username: the username
@@ -113,6 +104,12 @@ public class Client {
 		loadKeystore();
 		ClientTrustedConnection=false;
 		keyAgreed=false;
+		try {
+			this.digest=MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 	}
 
@@ -286,6 +283,7 @@ public class Client {
 	void sendMessage(ChatMessage cmsg) {
 		try {
 			byte[]	ToEncrypt=cmsg.getMessage();
+			cmsg.setDigest(digest.digest(ToEncrypt));
 		//	System.out.println(new String(ToEncrypt, "UTF-8")+"PRIN TO KWDIKOPOISEI");
 			cmsg.setMessage(aes.encrypt(ToEncrypt));
 		
@@ -454,12 +452,12 @@ public class Client {
 				// msg =" ";
 				try {
 					
-					byte[] msgS=(byte[]) sInput.readObject();
+					ChatMessage  cmS=(ChatMessage) sInput.readObject();
 				//	System.out.println(msgS+"PRIN TIN APOKWDIKOPOIISI");
-					byte[] msg =aes.decrypt(msgS);
-					String out=new String(msg, "ISO8859_7");
+					byte[] msg =aes.decrypt(cmS.getMessage());
+					String out=new String(msg, "UTF-8");
 					System.out.println(out);
-
+		if(cmS.checkDigest(digest.digest(msg))){
 					// if console mode print the message and add back the prompt
 					if (cg == null) {
 						System.out.println(out);
@@ -467,6 +465,10 @@ public class Client {
 					} else {
 						cg.append(out);
 					}
+					
+		}else{
+			JOptionPane.showMessageDialog(null, "Message altered", "InfoBox: " + "Digest error", JOptionPane.INFORMATION_MESSAGE);
+		}
 				} catch (IOException e) {
 					display("Server has close the connection: " + e);
 					if (cg != null)
@@ -494,7 +496,12 @@ public class Client {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-			}
+				
+			
+				
+				}
+			
+			
 		}
 
 		private boolean handshake() throws IOException, ClassNotFoundException, KeyStoreException {
@@ -503,8 +510,10 @@ public class Client {
 			X509Certificate ServerCert = (X509Certificate) sInput.readObject();
 			if(CertValidAndVerified(ServerCert)){
 				sOutput.writeObject(username);
+			
 				sOutput.flush();
-				sOutput.writeObject(clientKeystore.getCertificate("client"));				
+				sOutput.writeObject(clientKeystore.getCertificate("client"));		
+			
 			}else{
 				JOptionPane.showMessageDialog(null, "Server not trusted", "InfoBox: " + titleBar, JOptionPane.INFORMATION_MESSAGE);
 				System.exit(0);

@@ -4,7 +4,10 @@ package chatApp;
 /*
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
-import java.io.*;
+import java.io.Serializable;
+import java.security.MessageDigest;
+
+import org.bouncycastle.util.Arrays;
 /*
  * This class defines the different type of messages that will be exchanged between the
  * Clients and the Server. 
@@ -23,6 +26,7 @@ public class ChatMessage implements Serializable {
 	private int type;
 	private String message;
 	private byte [] encrypted;
+	private byte[]	 digest;
 	
 	
 	// constructor
@@ -51,5 +55,15 @@ public class ChatMessage implements Serializable {
 	}
 	void setMessage(byte[] msg){		
 		encrypted=msg;
+	}
+	void setDigest(byte[] digest){
+		this.digest=digest;
+	}
+	boolean checkDigest(byte [] other){
+		if(Arrays.areEqual(other, digest)){
+			return true;
+		}else{
+			return false;
+		}
 	}
 }
