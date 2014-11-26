@@ -21,13 +21,18 @@ public class RSA
     private X509Certificate pubCert;
     private PrivateKey priv;
     
+    
     public RSA(X509Certificate cert, PrivateKey k2)
     {
         pubCert = cert;
         priv = k2;
     }
     
-    public byte[] encrypt(String input) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, IllegalBlockSizeException, BadPaddingException
+    public RSA(PublicKey publicKey, Object k2) {
+		// TODO Auto-generated constructor stub
+	}
+
+	public byte[] encrypt(String input) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, IllegalBlockSizeException, BadPaddingException
     {
         Cipher rsaCipher = Cipher.getInstance("RSA");
         rsaCipher.init(Cipher.ENCRYPT_MODE, pubCert.getPublicKey());

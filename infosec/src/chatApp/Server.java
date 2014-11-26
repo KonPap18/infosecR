@@ -4,6 +4,7 @@ package chatApp;
 /*
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
+import java.awt.HeadlessException;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -19,6 +20,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Principal;
 import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
@@ -29,6 +32,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 
 import javax.crypto.BadPaddingException;
@@ -65,8 +69,11 @@ public class Server {
 	RSAPrivateKey ServerPrivateKey;
 	private X509Certificate ClientCertificate1;
 	private X509Certificate ClientCertificate2;
-	private KeyStore serverKeystore;	
+	private KeyStore serverKeystore;
+	private Signature sig;	
+	private MessageDigest shaServer;
 	static X509Certificate ServerCertificate;
+	
 	/*
 	 *  server constructor that receive the port to listen to for connection as parameter
 	 *  in console
@@ -315,12 +322,13 @@ public class Server {
 		private SecretKeySpec secKey;
 		private AES aes;
 		private boolean ServerTrustedConnection;
-		private MessageDigest sha256;
+		private MessageDigest sha1;
+		private byte[] otherSideSig;
 
 		// Constructore
 		ClientThread(Socket socket) {
 			try {
-				sha256=MessageDigest.getInstance("SHA-256");
+				sha1=MessageDigest.getInstance("SHA1");
 			} catch (NoSuchAlgorithmException e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
@@ -390,24 +398,48 @@ public class Server {
 					break;
 				}
 				// the messaage part of the ChatMessage
-				String message=null;
-				try {
-					//message=null;
-					message = new String(this.aes.decrypt(cm.getMessage()));
-				} catch (InvalidKeyException | IllegalStateException
-						| IllegalBlockSizeException | BadPaddingException
-						| NoSuchAlgorithmException | NoSuchPaddingException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+			
 				//byte [] messageDigest=sha256.digest(message.getBytes());
-				if(cm.checkDigest(sha256.digest(message.getBytes()))){
+			
 
 				// Switch on the type of message receive
 				switch(cm.getType()) {
 
 				case ChatMessage.MESSAGE:
-					broadcast(username + ": " + message);
+					String message=null;
+					otherSideSig=cm.getSignature();
+					try {
+						//message=null;
+						message = new String(this.aes.decrypt(cm.getMessage()));
+					} catch (InvalidKeyException | IllegalStateException
+							| IllegalBlockSizeException | BadPaddingException
+							| NoSuchAlgorithmException | NoSuchPaddingException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					if(cm.checkDigest(sha1.digest(message.getBytes()))){
+					try {
+						if(verify(otherSideSig, (X509Certificate) serverKeystore.getCertificate("client1"), message)){
+							broadcast(username + " (signing with client1 signature): " + message);
+						}else if(verify(otherSideSig, (X509Certificate) serverKeystore.getCertificate("client2"), message)){
+							broadcast(username + " (signing with client2 signature): " + message);
+						}else{
+							JOptionPane.showMessageDialog(null, "Could not verify sender", "InfoBox: " + "Signature error", JOptionPane.INFORMATION_MESSAGE);
+						}
+						
+					} catch (KeyStoreException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (HeadlessException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (SignatureException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					}else{
+						JOptionPane.showMessageDialog(null, "Message altered", "InfoBox: " + "Digest error", JOptionPane.INFORMATION_MESSAGE);
+					}
 					break;
 				case ChatMessage.LOGOUT:
 					display(username + " disconnected with a LOGOUT message.");
@@ -421,10 +453,16 @@ public class Server {
 						writeMsg((i+1) + ") " + ct.username + " since " + ct.date);
 					}
 					break;
+				case ChatMessage.RECEIPT:
+					String infoMessage="Message delivered";
+					if(sg == null){
+						System.out.print(infoMessage);
+					}else{
+						sg.appendRoom(infoMessage);  
+					}
+					break;
+				
 				}
-			}else{
-				JOptionPane.showMessageDialog(null, "Message altered", "InfoBox: " + "Digest error", JOptionPane.INFORMATION_MESSAGE);
-			}
 			// remove myself from the arrayList containing the list of the
 			// connected Clients
 		}
@@ -522,7 +560,8 @@ public class Server {
 			//System.out.println(msg);
 			try {
 				ChatMessage toSend=new ChatMessage(ChatMessage.MESSAGE, this.aes.encrypt(msg.getBytes()));
-				toSend.setDigest(sha256.digest(msg.getBytes()));				
+				toSend.setSignature(otherSideSig);
+				toSend.setDigest(sha1.digest(msg.getBytes()));				
 				sOutput.writeObject(toSend);
 			}
 			// if an error occurs, do not abort just inform the user
@@ -604,6 +643,58 @@ public class Server {
 	        s2 = new SecretKeySpec(full, "AES");
 	       secKey = new SecretKeySpec(full, "AES");
 	}
+	}
+
+	public boolean verify(byte[] otherSideSig, X509Certificate cer, String message) throws SignatureException {
+		// TODO Auto-generated method stub
+		byte[] decryptedSig=null;;
+		try {
+			shaServer=MessageDigest.getInstance("SHA1");
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte [] ourDigest=shaServer.digest(message.getBytes());
+		try {
+			sig=Signature.getInstance("SHA1withRSA");
+			sig.initVerify(cer);
+			sig.update(ourDigest);
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (SignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+			return sig.verify(otherSideSig);
+		
+		/*try {
+			shaServer=MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte [] ourDigest=shaServer.digest(message.getBytes());
+		RSA dec=new RSA(cer, null);
+		try {
+			decryptedSig=dec.decrypt(otherSideSig);
+		} catch (InvalidKeyException | NoSuchAlgorithmException
+				| NoSuchPaddingException | IllegalStateException
+				| IllegalBlockSizeException | BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		if(Arrays.equals(decryptedSig, ourDigest)){
+			return true;
+		}else{
+			return false;
+		}*/
+		
 	}
 }
 

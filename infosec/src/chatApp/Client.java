@@ -5,6 +5,7 @@ package chatApp;
 /*
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
+import java.awt.HeadlessException;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -18,6 +19,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
@@ -75,6 +78,9 @@ public class Client {
 	public boolean keyAgreed;
 	
 	private MessageDigest digest;
+	private RSA localRSA;
+	private Signature sig;
+	private MessageDigest shaClient;
 	/*
 	 * Constructor called by console mode server: the server address port: the
 	 * port number username: the username
@@ -105,14 +111,38 @@ public class Client {
 		ClientTrustedConnection=false;
 		keyAgreed=false;
 		try {
-			this.digest=MessageDigest.getInstance("SHA-256");
+			this.digest=MessageDigest.getInstance("SHA1");
 		} catch (NoSuchAlgorithmException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
 	}
+	private void sign(PrivateKey prv, byte[] msg, ChatMessage cm){
+		//byte messageDigest[]=digest.digest(msg);
+		try {
+			try {
+				sig=Signature.getInstance("SHA1withRSA");
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			sig.initSign(prv);
+			sig.update(cm.getDigest());
+			cm.setSignature(sig.sign());
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (SignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		
+	}
 
+	
 	private void loadKeystore() {
 		// TODO Auto-generated method stub
 		FileInputStream f;
@@ -209,9 +239,10 @@ public class Client {
 		return true;
 	}
 
+	
 	private void keyAgreement(PrivateKey privkey, X509Certificate cert ) throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException, IOException {
 		// TODO Auto-generated method stub
-		RSA localRSA=new RSA(cert, privkey);
+		localRSA=new RSA(cert, privkey);
 		RSA remoteRSA = null;
 	//	System.out.println("Client before try");
 		try {
@@ -286,6 +317,14 @@ public class Client {
 			cmsg.setDigest(digest.digest(ToEncrypt));
 		//	System.out.println(new String(ToEncrypt, "UTF-8")+"PRIN TO KWDIKOPOISEI");
 			cmsg.setMessage(aes.encrypt(ToEncrypt));
+			try {
+				//System.out.println((PrivateKey) clientKeystore.getKey("client", keystorePassword));
+			//	System.out.println(ToEncrypt);
+				sign((PrivateKey) clientKeystore.getKey("client", keystorePassword), ToEncrypt, cmsg);
+			} catch (UnrecoverableKeyException | KeyStoreException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		
 			sOutput.writeObject(cmsg);
 		} catch (IOException | InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException | IllegalStateException | IllegalBlockSizeException | BadPaddingException e) {
@@ -456,9 +495,34 @@ public class Client {
 				//	System.out.println(msgS+"PRIN TIN APOKWDIKOPOIISI");
 					byte[] msg =aes.decrypt(cmS.getMessage());
 					String out=new String(msg, "UTF-8");
-					System.out.println(out);
+					//System.out.println(out);
 		if(cmS.checkDigest(digest.digest(msg))){
-					// if console mode print the message and add back the prompt
+			try {
+				//if(!verify(cmS.getSignature(), (X509Certificate) clientKeystore.getCertificate("client"), out)){
+				if(!out.contains(username)){	
+				
+					ChatMessage  receipt=new ChatMessage(ChatMessage.RECEIPT,  "".getBytes());
+					System.out.println("mpike");
+					receipt.setDigest(digest.digest(out.getBytes()));;
+					receipt.setMessage(localRSA.encrypt(out.getBytes()));
+					sign((PrivateKey) clientKeystore.getKey("client", keystorePassword), msg, receipt);
+					sOutput.writeObject(receipt);
+				}
+				
+				
+			} catch (KeyStoreException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (HeadlessException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (UnrecoverableKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			
+			// if console mode print the message and add back the prompt
 					if (cg == null) {
 						System.out.println(out);
 						System.out.print("> ");
@@ -466,7 +530,7 @@ public class Client {
 						cg.append(out);
 					}
 					
-		}else{
+				}else{
 			JOptionPane.showMessageDialog(null, "Message altered", "InfoBox: " + "Digest error", JOptionPane.INFORMATION_MESSAGE);
 		}
 				} catch (IOException e) {
@@ -503,7 +567,34 @@ public class Client {
 			
 			
 		}
-
+		
+		public boolean verify(byte[] otherSideSig, X509Certificate cer, String message) throws SignatureException {
+			// TODO Auto-generated method stub
+			byte[] decryptedSig=null;;
+			try {
+				shaClient=MessageDigest.getInstance("SHA1");
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			byte [] ourDigest=shaClient.digest(message.getBytes());
+			try {
+				sig=Signature.getInstance("SHA1withRSA");
+				sig.initVerify(cer);
+				sig.update(ourDigest);
+			} catch (InvalidKeyException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (SignatureException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+				return sig.verify(otherSideSig);
+		}
 		private boolean handshake() throws IOException, ClassNotFoundException, KeyStoreException {
 			// TODO Auto-generated method stub
 			boolean ok=false;

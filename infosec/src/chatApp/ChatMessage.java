@@ -5,7 +5,7 @@ package chatApp;
  * Source code from http://www.dreamincode.net/forums/topic/259777-a-simple-chat-program-with-clientserver-gui-optional/
  */
 import java.io.Serializable;
-import java.security.MessageDigest;
+import java.security.PrivateKey;
 
 import org.bouncycastle.util.Arrays;
 /*
@@ -22,11 +22,13 @@ public class ChatMessage implements Serializable {
 	// WHOISIN to receive the list of the users connected
 	// MESSAGE an ordinary message
 	// LOGOUT to disconnect from the Server
-	static final int WHOISIN = 0, MESSAGE = 1, LOGOUT = 2;
+	static final int WHOISIN = 0, MESSAGE = 1, LOGOUT = 2, RECEIPT =3;
 	private int type;
 	private String message;
 	private byte [] encrypted;
 	private byte[]	 digest;
+	private byte[] signature;
+	
 	
 	
 	// constructor
@@ -60,10 +62,26 @@ public class ChatMessage implements Serializable {
 		this.digest=digest;
 	}
 	boolean checkDigest(byte [] other){
+
 		if(Arrays.areEqual(other, digest)){
 			return true;
 		}else{
 			return false;
 		}
 	}
+
+	public void setSignature(byte[] sign) {
+		// TODO Auto-generated method stub
+		this.signature=sign;
+		
+	}
+	public byte[] getSignature(){
+		return this.signature;
+	}
+
+	public byte[] getDigest() {
+		// TODO Auto-generated method stub
+		return digest;
+	}
+	
 }
